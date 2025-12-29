@@ -4,3 +4,6 @@ dist/
 .bun/
 target/
 .DS_Store
+ai_context/
+.agent/
+.shared
