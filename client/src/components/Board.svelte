@@ -21,21 +21,47 @@
             );
             isDragging = true;
         }
-        gameState.setBoard(e.detail.items);
+
+        // --- ENFORCE LOCKED WALL ---
+        // 1. Get the authoritative list of revealed cards (These CANNOT move)
+        // We trust the local store's order of revealed cards, or just filter from store.
+        const lockedRevealed = $gameState.board.filter((c) => c.isFaceUp);
+
+        // 2. Get the new proposed order from dndzone
+        const newItems = e.detail.items;
+
+        // 3. Extract the hidden cards from the new order (These are what the user is moving)
+        const movingHidden = newItems.filter((c) => !c.isFaceUp);
+
+        // 4. Force merge: [Locked Revealed] + [Moving Hidden]
+        // This physically prevents any hidden card from having an index < lockedRevealed.length
+        const forcedOrder = [...lockedRevealed, ...movingHidden];
+
+        gameState.setBoard(forcedOrder);
     }
 
     function handleDndFinalize(e: CustomEvent<DndEvent<Card>>) {
         isDragging = false;
-        const newItems = e.detail.items;
 
-        // Restore any missing foreign cards (Anti-Theft)
+        // --- 1. ENFORCE LOCKED WALL (Same as Consider) ---
+        const lockedRevealed = $gameState.board.filter((c) => c.isFaceUp);
+        const newItemsFromDnd = e.detail.items;
+        const movingHidden = newItemsFromDnd.filter((c) => !c.isFaceUp);
+        let finalBoard = [...lockedRevealed, ...movingHidden]; // Initial forced state
+
+        // --- 2. RESTORE MISSING FOREIGN CARDS (Anti-Theft) ---
+        // We check against 'finalBoard' (which has the wall enforced).
+        // Any foreign card that was hidden and is now missing needs to be put back.
+        // Wait, 'pinnedForeignCards' might include revealed ones too?
+        // Yes, but revealed ones are in 'lockedRevealed' so they are safe.
+        // So we only really care about hidden foreign cards being stolen.
         const missing = pinnedForeignCards.filter(
-            (pinned) => !newItems.some((n) => n.id === pinned.id),
+            (pinned) => !finalBoard.some((n) => n.id === pinned.id),
         );
 
-        let finalBoard = newItems;
         if (missing.length > 0) {
-            finalBoard = [...newItems, ...missing];
+            // Append them back
+            finalBoard = [...finalBoard, ...missing];
         }
 
         gameState.setBoard(finalBoard);
@@ -67,7 +93,11 @@
         {/if}
 
         {#each $gameState.board as card (card.id)}
-            <div animate:flip={{ duration: flipDurationMs }}>
+            <div
+                animate:flip={{ duration: flipDurationMs }}
+                class:pointer-events-none={card.isFaceUp}
+                class:opacity-100={card.isFaceUp}
+            >
                 <CardComponent
                     {card}
                     hidden={!card.isFaceUp}

@@ -2,6 +2,7 @@ export interface Player {
     id: string;
     name: string;
     isHost: boolean;
+    cardCount?: number;
     ws: any; // WebSocket connection
 }
 

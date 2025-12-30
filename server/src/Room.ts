@@ -84,6 +84,30 @@ export class Room {
 
     updateBoard(newBoard: Card[]) {
         this.board = newBoard;
+        // Also update hands? 
+        // If a card is on the board, it should be removed from the hand.
+        // But currently our 'hands' Map in Room.ts is STATIC after deal?
+        // Wait, 'startGame' sets 'this.hands'. 
+        // When client moves card Hand->Board, they tell server 'UPDATE_BOARD'.
+        // But server's 'hands' map is NOT updated? 
+        // If we want 'cardCount' to be accurate, we must Sync 'hands' on server too.
+
+        // This is a bit tricky with the catch-all 'UPDATE_BOARD'.
+        // We need to deduct cards from hands based on what's on the board.
+        // Or, we trust the Client to tell us their hand? No, that's cheating risk.
+        // Better: Re-calculate hands based on Deck - Board?
+        // Or simply: Remove card from owner's hand if it appears on board.
+
+        newBoard.forEach(card => {
+            const playerHand = this.hands.get(card.playerId);
+            if (playerHand) {
+                const cardIndex = playerHand.findIndex(c => c.id === card.id);
+                if (cardIndex !== -1) {
+                    playerHand.splice(cardIndex, 1);
+                }
+            }
+        });
+
         // Broadcast the update to everyone
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
@@ -122,7 +146,10 @@ export class Room {
         return {
             code: this.code,
             gameState: this.gameState,
-            players: this.players.map(({ ws, ...rest }) => rest), // Exclude ws from state
+            players: this.players.map(({ ws, ...rest }) => ({
+                ...rest,
+                cardCount: this.hands.get(rest.id)?.length || 0
+            })),
             board: this.board
         };
     }
