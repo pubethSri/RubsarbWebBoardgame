@@ -1,0 +1,44 @@
+packs:
+  - id: "starter_pack"
+    name: "The Essentials"
+    description: "Classic topics to get everyone comfortable with the game."
+    topics:
+      - text: "Spicy Food"
+        min_label: "Not Spicy"
+        max_label: "Hell"
+      
+      - text: "Popular Movies"
+        min_label: "Worst Movie Ever"
+        max_label: "Masterpiece"
+      
+      - text: "Animals you could beat in a fight"
+        min_label: "Easy"
+        max_label: "Impossible"
+
+      - text: "Useful items in a zombie apocalypse"
+        min_label: "Useless"
+        max_label: "Essential"
+
+  - id: "social_chaos"
+    name: "Social Chaos"
+    description: "Topics designed to start arguments and expose your friends."
+    topics:
+      - text: "A place for a First Date"
+        min_label: "Immediate Breakup"
+        max_label: "Wedding Bells"
+      
+      - text: "Things you want to find in your pocket"
+        min_label: "Terrifying"
+        max_label: "Made your day"
+
+  - id: "fantasy_scenarios"
+    name: "Isekai & Fantasy"
+    description: "For the geeks and dreamers."
+    topics:
+      - text: "Powerful Superpowers"
+        min_label: "Useless"
+        max_label: "Strongest"
+      
+      - text: "Useful Items for fighting dragons"
+        min_label: "Useless"
+        max_label: "Essential"

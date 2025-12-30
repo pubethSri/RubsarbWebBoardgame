@@ -1,10 +1,15 @@
-import type { Player, RoomState, GameStatus, Card, WsResponse } from './types';
+import type { Player, RoomState, GameStatus, Card, WsResponse, Topic } from './types';
+import { TopicManager } from './TopicManager';
+
+const topicManager = new TopicManager();
 
 export class Room {
     public code: string;
     public players: Player[] = [];
     public gameState: GameStatus = 'LOBBY';
     public board: Card[] = [];
+    public topic: Topic | null = null;
+    public version: number = 0;
     private deck: number[] = [];
     private hands: Map<string, Card[]> = new Map();
 
@@ -35,6 +40,7 @@ export class Room {
         this.gameState = 'PLAYING';
         this.deck = Array.from({ length: 100 }, (_, i) => i + 1);
         this.hands.clear();
+        this.version = 0; // Reset version on game start
 
         // Shuffle
         for (let i = this.deck.length - 1; i > 0; i--) {
@@ -57,6 +63,13 @@ export class Room {
             }
             this.hands.set(player.id, hand);
         });
+
+        const rawTopic = topicManager.getRandomTopic();
+        this.topic = {
+            text: rawTopic.text,
+            minRange: rawTopic.min_label,
+            maxRange: rawTopic.max_label
+        };
 
         // Broadcast GAME_STARTED with private hands
         this.players.forEach(player => {
@@ -82,23 +95,90 @@ export class Room {
         });
     }
 
-    updateBoard(newBoard: Card[]) {
-        this.board = newBoard;
-        // Also update hands? 
-        // If a card is on the board, it should be removed from the hand.
-        // But currently our 'hands' Map in Room.ts is STATIC after deal?
-        // Wait, 'startGame' sets 'this.hands'. 
-        // When client moves card Hand->Board, they tell server 'UPDATE_BOARD'.
-        // But server's 'hands' map is NOT updated? 
-        // If we want 'cardCount' to be accurate, we must Sync 'hands' on server too.
+    // New Atomic Move Logic
+    moveCard(cardId: string, targetIndex: number) {
+        // 1. Find the card in the current board
+        const currentIndex = this.board.findIndex(c => c.id === cardId);
 
-        // This is a bit tricky with the catch-all 'UPDATE_BOARD'.
-        // We need to deduct cards from hands based on what's on the board.
-        // Or, we trust the Client to tell us their hand? No, that's cheating risk.
-        // Better: Re-calculate hands based on Deck - Board?
-        // Or simply: Remove card from owner's hand if it appears on board.
+        // If not found in board, check if it's in a hand (First play)
+        if (currentIndex === -1) {
+            // Find in hands
+            let foundInHand = false;
+            for (const [playerId, hand] of this.hands.entries()) {
+                const handIndex = hand.findIndex(c => c.id === cardId);
+                if (handIndex !== -1) {
+                    const [card] = hand.splice(handIndex, 1);
+                    // Add to board at targetIndex
+                    this.board.splice(targetIndex, 0, card);
+                    foundInHand = true;
+                    break;
+                }
+            }
+            if (!foundInHand) {
+                console.warn(`Card ${cardId} not found in board or hands`);
+                return;
+            }
+        } else {
+            // Move within board
+            const [card] = this.board.splice(currentIndex, 1);
+            if (card.isFaceUp) {
+                console.warn(`Attempt to move revealed card ${cardId}`);
+                // Revert
+                this.board.splice(currentIndex, 0, card);
+                return;
+            }
+            this.board.splice(targetIndex, 0, card);
+        }
+
+        // Increment version
+        this.version++;
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+    }
+
+    returnCard(cardId: string) {
+        console.log(`[Room ${this.code}] returnCard request: ${cardId}`);
+        const index = this.board.findIndex(c => c.id === cardId);
+        if (index === -1) {
+            console.warn(`Card ${cardId} not found on board to return`);
+            return;
+        }
+
+        const card = this.board[index];
+        // @ts-ignore
+        if (card.isFaceUp) {
+            console.warn(`Cannot return revealed card ${cardId}`);
+            return;
+        }
+
+        // Remove from board
+        this.board.splice(index, 1);
+
+        // Return to owner's hand
+        // @ts-ignore
+        const hand = this.hands.get(card.playerId);
+        if (hand) {
+            // @ts-ignore
+            hand.push(card);
+            // Optionally: sort hand?
+        } else {
+            // Should not happen if player is in room
+            // @ts-ignore
+            this.hands.set(card.playerId, [card]);
+        }
+
+        this.version++;
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+    }
+
+    updateBoard(newBoard: Card[]) {
+        // Fallback or Deprecated? 
+        // For now, let's keep it but ideally we switch to moveCard everywhere.
+        this.board = newBoard;
+        this.version++; // Even full overwrites bump version
+        // ... (rest of updateBoard logic)
 
         newBoard.forEach(card => {
+            // ... (hand syncing logic)
             const playerHand = this.hands.get(card.playerId);
             if (playerHand) {
                 const cardIndex = playerHand.findIndex(c => c.id === card.id);
@@ -108,7 +188,6 @@ export class Room {
             }
         });
 
-        // Broadcast the update to everyone
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
 
@@ -139,6 +218,20 @@ export class Room {
             }
 
             this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+
+            // Check if ALL cards are now revealed
+            const allRevealed = this.board.every(c => c.isFaceUp);
+            if (allRevealed) {
+                // Check if sorted
+                const isSorted = this.board.every((c, i, arr) => i === 0 || c.value >= arr[i - 1].value);
+
+                if (isSorted) {
+                    console.log("✅ SUCCESS: All cards revealed in ascending order!");
+                    // TODO: Trigger round win state/animation in future
+                } else {
+                    console.log("⚠️ GAME OVER: All cards revealed but order is wrong.");
+                }
+            }
         }
     }
 
@@ -150,7 +243,9 @@ export class Room {
                 ...rest,
                 cardCount: this.hands.get(rest.id)?.length || 0
             })),
-            board: this.board
+            board: this.board,
+            topic: this.topic,
+            version: this.version
         };
     }
 }

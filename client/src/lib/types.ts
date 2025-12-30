@@ -20,11 +20,18 @@ export interface BoardSlot {
 
 export type GameStatus = 'LOBBY' | 'PLAYING' | 'REVEAL' | 'ROUND_END';
 
+export interface Topic {
+    text: string;
+    minRange: string;
+    maxRange: string;
+}
+
 export interface RoomState {
     code: string;
     players: Player[];
     gameState: GameStatus;
     board: Card[];
+    topic: Topic | null;
 }
 
 export interface GameState {
@@ -35,6 +42,7 @@ export interface GameState {
     gameState: GameStatus;
     board: Card[];
     hand: Card[];
+    topic: Topic | null;
     error: string | null;
 }
 
@@ -43,7 +51,8 @@ export type WsMessage =
     | { type: 'JOIN_ROOM'; payload: { roomCode: string; playerName: string } }
     | { type: 'LEAVE_ROOM'; payload: null }
     | { type: 'START_GAME'; payload: null }
-    | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number | null } }
+    | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number } }
+    | { type: 'RETURN_CARD'; payload: { cardId: string } }
     | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
     | { type: 'REVEAL_NEXT'; payload: null }; // New Reveal action
 

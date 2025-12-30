@@ -16,11 +16,19 @@ export interface Card {
 
 export type GameStatus = 'LOBBY' | 'PLAYING' | 'REVEAL' | 'ROUND_END';
 
+export interface Topic {
+    text: string;
+    minRange: string;
+    maxRange: string;
+}
+
 export interface RoomState {
     code: string;
-    players: Omit<Player, 'ws'>[];
+    players: Player[];
     gameState: GameStatus;
     board: Card[];
+    topic: Topic | null;
+    version: number;
 }
 
 export type WsMessage =
@@ -28,7 +36,8 @@ export type WsMessage =
     | { type: 'JOIN_ROOM'; payload: { roomCode: string; playerName: string } }
     | { type: 'LEAVE_ROOM'; payload: null }
     | { type: 'START_GAME'; payload: null }
-    | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number | null } }
+    | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number } } // Changed from null targetIndex
+    | { type: 'RETURN_CARD'; payload: { cardId: string } }
     | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
     | { type: 'REVEAL_NEXT'; payload: null }; // New message for full board sync
 

@@ -8,83 +8,95 @@
 
     const flipDurationMs = 300;
 
-    // Board Logic: Dynamic single drop zone with "Anti-Theft" pinning
-
+    // --- CONCURRENCY STATE ---
+    let localBoard: Card[] = [];
     let isDragging = false;
+    let pendingServerUpdate: Card[] | null = null;
     let pinnedForeignCards: Card[] = [];
+
+    // --- SYNC LOGIC (Update Buffering) ---
+    // Reactive: Sync localBoard from store only if NOT dragging
+    $: if (!isDragging && $gameState.board) {
+        // If we just finished dragging and had a pending update, apply it?
+        // Or if we are idle, always mirror the server.
+        // We defer to the server state when idle.
+        localBoard = $gameState.board;
+    }
 
     function handleDndConsider(e: CustomEvent<DndEvent<Card>>) {
         if (!isDragging) {
+            // Start of Drag
             const myPlayerId = $gameState.playerId;
-            pinnedForeignCards = $gameState.board.filter(
+            pinnedForeignCards = localBoard.filter(
                 (c) => c.playerId !== myPlayerId,
             );
             isDragging = true;
         }
 
         // --- ENFORCE LOCKED WALL ---
-        // 1. Get the authoritative list of revealed cards (These CANNOT move)
-        // We trust the local store's order of revealed cards, or just filter from store.
-        const lockedRevealed = $gameState.board.filter((c) => c.isFaceUp);
-
-        // 2. Get the new proposed order from dndzone
+        const lockedRevealed = localBoard.filter((c) => c.isFaceUp);
         const newItems = e.detail.items;
-
-        // 3. Extract the hidden cards from the new order (These are what the user is moving)
         const movingHidden = newItems.filter((c) => !c.isFaceUp);
 
-        // 4. Force merge: [Locked Revealed] + [Moving Hidden]
-        // This physically prevents any hidden card from having an index < lockedRevealed.length
+        // Force merge
         const forcedOrder = [...lockedRevealed, ...movingHidden];
 
-        gameState.setBoard(forcedOrder);
+        localBoard = forcedOrder;
     }
 
     function handleDndFinalize(e: CustomEvent<DndEvent<Card>>) {
-        isDragging = false;
-
-        // --- 1. ENFORCE LOCKED WALL (Same as Consider) ---
-        const lockedRevealed = $gameState.board.filter((c) => c.isFaceUp);
         const newItemsFromDnd = e.detail.items;
+
+        // --- 1. ENFORCE LOCKED WALL ---
+        const lockedRevealed = localBoard.filter((c) => c.isFaceUp);
         const movingHidden = newItemsFromDnd.filter((c) => !c.isFaceUp);
-        let finalBoard = [...lockedRevealed, ...movingHidden]; // Initial forced state
+        let finalBoard = [...lockedRevealed, ...movingHidden];
 
-        // --- 2. RESTORE MISSING FOREIGN CARDS (Anti-Theft) ---
-        // We check against 'finalBoard' (which has the wall enforced).
-        // Any foreign card that was hidden and is now missing needs to be put back.
-        // Wait, 'pinnedForeignCards' might include revealed ones too?
-        // Yes, but revealed ones are in 'lockedRevealed' so they are safe.
-        // So we only really care about hidden foreign cards being stolen.
-        const missing = pinnedForeignCards.filter(
-            (pinned) => !finalBoard.some((n) => n.id === pinned.id),
-        );
 
-        if (missing.length > 0) {
-            // Append them back
-            finalBoard = [...finalBoard, ...missing];
+        // Update local visual state immediately
+        localBoard = finalBoard;
+
+        // --- 3. DETECT MOVED CARD & SEND INTENT ---
+        // We need to find which card ID caused this event.
+        // svelte-dnd-action usually provides `info` in detail.
+        // @ts-ignore
+        const movedCardId = e.detail.info.id;
+
+        if (movedCardId) {
+            const targetIndex = finalBoard.findIndex(
+                (c) => c.id === movedCardId,
+            );
+            if (targetIndex !== -1) {
+                // Send Atomic Move Intent
+                socketStore.sendMessage({
+                    type: "MOVE_CARD",
+                    payload: { cardId: movedCardId, targetIndex },
+                });
+            }
         }
 
-        gameState.setBoard(finalBoard);
-
-        socketStore.sendMessage({
-            type: "UPDATE_BOARD",
-            payload: { board: finalBoard },
-        });
-
         pinnedForeignCards = [];
+        isDragging = false;
+
+        // Note: isDragging = false will trigger the reactive statement `$gameState.board`
+        // to overwrite `localBoard` with the server state.
+        // However, if we moved a card, the server hasn't confirmed it yet!
+        // This might cause a "jump back" if the server is slow.
+        // Ideally, we should wait for a matching version or keep our speculative state.
+        // But for now, the "jump" is safer than "drag kill".
+        // We could improve this by checking versions later.
     }
 </script>
 
-<div class="max-w-5xl mx-auto mt-20 relative flex justify-center px-4">
+<div class="w-full max-w-5xl mx-auto mt-4 relative flex justify-center px-4">
     <!-- Active Drop Zone (The Board) -->
-    <!-- We make this the dashed container itself -->
     <div
         class="w-full min-h-[400px] border-4 border-dashed border-gray-300 rounded-3xl flex flex-wrap justify-center content-start gap-4 p-8 transition-colors bg-gray-50/50"
-        use:dndzone={{ items: $gameState.board, flipDurationMs }}
+        use:dndzone={{ items: localBoard, flipDurationMs }}
         on:consider={handleDndConsider}
         on:finalize={handleDndFinalize}
     >
-        {#if $gameState.board.length === 0}
+        {#if localBoard.length === 0}
             <div
                 class="w-full h-full flex items-center justify-center text-gray-400 font-medium italic pointer-events-none absolute inset-0"
             >
@@ -92,7 +104,7 @@
             </div>
         {/if}
 
-        {#each $gameState.board as card (card.id)}
+        {#each localBoard as card (card.id)}
             <div
                 animate:flip={{ duration: flipDurationMs }}
                 class:pointer-events-none={card.isFaceUp}

@@ -12,6 +12,7 @@ const initialState: GameStore = {
     gameState: 'LOBBY',
     board: [],
     hand: [],
+    topic: null,
     error: null
 };
 
@@ -22,13 +23,14 @@ function createGameState() {
         subscribe,
         setConnected: (connected: boolean) => update(s => ({ ...s, isConnected: connected })),
         joinRoom: (code: string, playerId: string) => update(s => ({ ...s, roomCode: code, playerId })),
-        leaveRoom: () => update(s => ({ ...s, roomCode: null, playerId: null, players: [], gameState: 'LOBBY', board: [], hand: [], error: null })),
+        leaveRoom: () => update(s => ({ ...s, roomCode: null, playerId: null, players: [], gameState: 'LOBBY', board: [], hand: [], topic: null, error: null })),
         updateRoom: (state: RoomState) =>
             update(s => ({
                 ...s,
                 players: state.players,
                 gameState: state.gameState,
-                board: state.board || []
+                board: state.board || [],
+                topic: state.topic
             })),
         startGame: (hand: Card[], board: Card[]) => update(s => ({ ...s, gameState: 'PLAYING', hand, board })),
         setHand: (hand: Card[]) => update(s => ({ ...s, hand })),

@@ -41,8 +41,32 @@
         </div>
     </div>
 
-    <!-- Game Area -->
-    <Board />
+    <!-- Main Content Container with padding for header -->
+    <div
+        class="w-full h-screen pt-20 pb-32 flex flex-col items-center overflow-y-auto"
+    >
+        <!-- Topic Display -->
+        {#if $gameState.topic}
+            <div
+                class="flex flex-col items-center justify-center p-4 pointer-events-none mb-4"
+            >
+                <h1
+                    class="text-3xl font-black text-center uppercase tracking-widest leading-tight max-w-4xl"
+                >
+                    {$gameState.topic.text}
+                </h1>
+                <div
+                    class="flex gap-16 mt-2 text-xs font-bold font-mono text-gray-400 uppercase tracking-widest"
+                >
+                    <span>1 = {$gameState.topic.minRange}</span>
+                    <span>100 = {$gameState.topic.maxRange}</span>
+                </div>
+            </div>
+        {/if}
+
+        <!-- Game Area -->
+        <Board />
+    </div>
 
     <!-- Player Hand -->
     <Hand />

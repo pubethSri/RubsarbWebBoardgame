@@ -27,6 +27,27 @@ const app = new Elysia()
                 room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
             }
 
+            if (msg.type === 'MOVE_CARD') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        const { cardId, targetIndex } = msg.payload;
+                        room.moveCard(cardId, targetIndex);
+                    }
+                }
+            }
+
+            if (msg.type === 'RETURN_CARD') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.returnCard(msg.payload.cardId);
+                    }
+                }
+            }
+
             if (msg.type === 'JOIN_ROOM') {
                 const room = roomManager.getRoom(msg.payload.roomCode);
                 if (room) {
