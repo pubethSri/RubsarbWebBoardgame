@@ -48,6 +48,17 @@ const app = new Elysia()
                 }
             }
 
+            if (msg.type === 'UPDATE_NOTE') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        const { cardId, note } = msg.payload;
+                        room.updateNote(cardId, note);
+                    }
+                }
+            }
+
             if (msg.type === 'JOIN_ROOM') {
                 const room = roomManager.getRoom(msg.payload.roomCode);
                 if (room) {

@@ -170,6 +170,33 @@ export class Room {
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
 
+    updateNote(cardId: string, note: string) {
+        // 1. Try to find in Board
+        const boardCard = this.board.find(c => c.id === cardId);
+        if (boardCard) {
+            boardCard.note = note;
+            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+            return;
+        }
+
+        // 2. Try to find in Hands
+        for (const [playerId, hand] of this.hands.entries()) {
+            const handCard = hand.find(c => c.id === cardId);
+            if (handCard) {
+                handCard.note = note;
+                // Resend GAME_STARTED to update private hands
+                const player = this.players.find(p => p.id === playerId);
+                if (player && player.ws) {
+                    player.ws.send(JSON.stringify({
+                        type: 'GAME_STARTED',
+                        payload: { hand, board: this.board }
+                    }));
+                }
+                return;
+            }
+        }
+    }
+
     updateBoard(newBoard: Card[]) {
         // Fallback or Deprecated? 
         // For now, let's keep it but ideally we switch to moveCard everywhere.

@@ -38,6 +38,7 @@ export type WsMessage =
     | { type: 'START_GAME'; payload: null }
     | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number } } // Changed from null targetIndex
     | { type: 'RETURN_CARD'; payload: { cardId: string } }
+    | { type: 'UPDATE_NOTE'; payload: { cardId: string; note: string } }
     | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
     | { type: 'REVEAL_NEXT'; payload: null }; // New message for full board sync
 

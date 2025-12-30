@@ -52,7 +52,6 @@
         const movingHidden = newItemsFromDnd.filter((c) => !c.isFaceUp);
         let finalBoard = [...lockedRevealed, ...movingHidden];
 
-
         // Update local visual state immediately
         localBoard = finalBoard;
 
