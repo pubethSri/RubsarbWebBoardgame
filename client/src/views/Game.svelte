@@ -2,6 +2,7 @@
     import Board from "../components/Board.svelte";
     import Hand from "../components/Hand.svelte";
     import Result from "./Result.svelte";
+    import PlayerList from "../components/PlayerList.svelte";
     import { gameState } from "../lib/stores/gameState";
     import { socketStore } from "../lib/stores/socket";
 </script>
@@ -17,13 +18,13 @@
             playerCount={$gameState.players.length}
         />
     {:else}
+        <PlayerList />
+
         <!-- Header info -->
         <div
-            class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10"
+            class="absolute top-0 left-0 right-0 p-4 flex justify-end items-center z-10 pointers-events-none"
         >
-            <div class="font-bold text-xl tracking-tight">Rubsarb</div>
-
-            <div class="flex gap-4 items-center">
+            <div class="flex gap-4 items-center pointer-events-auto">
                 {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
                     {@const allCardsPlaced = $gameState.players.every(
                         (p) => (p.cardCount ?? 0) === 0,

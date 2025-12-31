@@ -12,6 +12,27 @@ export const socketStore = {
         socket.onopen = () => {
             console.log("🟢 Connected to WebSocket");
             gameState.setConnected(true);
+
+            // AUTO-RECONNECT LOGIC
+            const sessionRaw = localStorage.getItem('rubsarb_session');
+            if (sessionRaw) {
+                try {
+                    const session = JSON.parse(sessionRaw);
+                    if (session.token && session.roomId) {
+                        console.log("🔄 Attempting to Reconnect...", session.roomId);
+                        socket?.send(JSON.stringify({
+                            type: 'RECONNECT',
+                            payload: {
+                                token: session.token,
+                                roomId: session.roomId
+                            }
+                        }));
+                    }
+                } catch (e) {
+                    console.error("Invalid session data", e);
+                    localStorage.removeItem('rubsarb_session');
+                }
+            }
         };
 
         socket.onmessage = (event) => {
@@ -22,6 +43,11 @@ export const socketStore = {
                 switch (msg.type) {
                     case 'JOINED_ROOM':
                         gameState.joinRoom(msg.payload.code, msg.payload.playerId);
+                        localStorage.setItem('rubsarb_session', JSON.stringify({
+                            token: msg.payload.token,
+                            roomId: msg.payload.code,
+                            playerId: msg.payload.playerId
+                        }));
                         break;
                     case 'ROOM_UPDATED':
                         gameState.updateRoom(msg.payload);
@@ -32,7 +58,20 @@ export const socketStore = {
                     case 'ROUND_ENDED':
                         gameState.setRoundResult(msg.payload.result, msg.payload.board);
                         break;
+                    case 'WELCOME_BACK':
+                        // Restore state
+                        const session = localStorage.getItem('rubsarb_session');
+                        const playerId = session ? JSON.parse(session).playerId : null;
+                        if (playerId) {
+                            gameState.setFullState(msg.payload.gameState, msg.payload.hand, playerId);
+                        }
+                        break;
                     case 'ERROR':
+                        // If session error (e.g. expired), clear storage
+                        if (msg.payload.message.includes('Session expired')) {
+                            localStorage.removeItem('rubsarb_session');
+                            window.location.reload();
+                        }
                         gameState.setError(msg.payload.message);
                         break;
                 }
@@ -57,9 +96,12 @@ export const socketStore = {
     },
 
     disconnect: () => {
+        localStorage.removeItem('rubsarb_session');
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'LEAVE_ROOM', payload: null }));
-            gameState.leaveRoom();
         }
+        gameState.leaveRoom();
+        // Optional: Reload to ensure clean slate, but state reset should be enough
+        // window.location.reload(); 
     }
 };

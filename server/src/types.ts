@@ -3,7 +3,10 @@ export interface Player {
     name: string;
     isHost: boolean;
     cardCount?: number;
-    ws: any; // WebSocket connection
+    ws?: any; // WebSocket connection
+    token: string; // Session token
+    isConnected: boolean;
+    disconnectTimeout?: any;
 }
 
 export interface Card {
@@ -29,6 +32,8 @@ export interface RoomState {
     board: Card[];
     topic: Topic | null;
     version: number;
+    level: number;
+    readyCount: number;
 }
 
 export type WsMessage =
@@ -36,16 +41,20 @@ export type WsMessage =
     | { type: 'JOIN_ROOM'; payload: { roomCode: string; playerName: string } }
     | { type: 'LEAVE_ROOM'; payload: null }
     | { type: 'START_GAME'; payload: null }
-    | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number } } // Changed from null targetIndex
+    | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number } }
     | { type: 'RETURN_CARD'; payload: { cardId: string } }
     | { type: 'UPDATE_NOTE'; payload: { cardId: string; note: string } }
     | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
     | { type: 'REVEAL_NEXT'; payload: null }
-    | { type: 'PLAYER_READY'; payload: null };
+    | { type: 'PLAYER_READY'; payload: null }
+    | { type: 'RECONNECT'; payload: { token: string; roomId: string } };
 
 export type WsResponse =
     | { type: 'ROOM_UPDATED'; payload: RoomState }
     | { type: 'ERROR'; payload: { message: string } }
-    | { type: 'JOINED_ROOM'; payload: { code: string; playerId: string } }
+    | { type: 'JOINED_ROOM'; payload: { code: string; playerId: string; token: string } }
     | { type: 'GAME_STARTED'; payload: { hand: Card[]; board: Card[] } }
-    | { type: 'ROUND_ENDED'; payload: { result: 'WIN' | 'LOSS'; board: Card[] } };
+    | { type: 'ROUND_ENDED'; payload: { result: 'WIN' | 'LOSS'; board: Card[] } }
+    | { type: 'WELCOME_BACK'; payload: { gameState: RoomState; hand: Card[] } }
+    | { type: 'PLAYER_DC'; payload: { playerId: string } }
+    | { type: 'PLAYER_RECONNECTED'; payload: { playerId: string } };

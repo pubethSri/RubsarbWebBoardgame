@@ -25,7 +25,7 @@ const app = new Elysia()
                 // Store session in local Map
                 activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
 
-                ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id } }));
+                ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
                 room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
             }
 
@@ -69,7 +69,7 @@ const app = new Elysia()
                     // Store session in local Map
                     activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
 
-                    ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id } }));
+                    ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
                     room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
                 } else {
                     ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Room not found' } }));
@@ -143,6 +143,33 @@ const app = new Elysia()
                     }
                 }
             }
+
+            if (msg.type === 'RECONNECT') {
+                const room = roomManager.getRoom(msg.payload.roomId);
+                if (room) {
+                    const player = room.reconnectPlayer(msg.payload.token, ws);
+                    if (player) {
+                        console.log(`♻️ Player ${player.name} reconnected to room ${room.code}`);
+
+                        // Register Session
+                        activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
+
+                        // Send Welcome Back
+                        ws.send(JSON.stringify({
+                            type: 'WELCOME_BACK',
+                            payload: {
+                                gameState: room.getState(),
+                                // @ts-ignore
+                                hand: room.hands.get(player.id) || []
+                            }
+                        }));
+                    } else {
+                        ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Session expired or invalid token' } }));
+                    }
+                } else {
+                    ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Room not found' } }));
+                }
+            }
         },
         close(ws) {
             const session = activeSessions.get(ws.id);
@@ -153,14 +180,21 @@ const app = new Elysia()
 
                 const room = roomManager.getRoom(roomId);
                 if (room) {
-                    room.removePlayer(playerId);
-                    console.log(`❌ Player ${playerId} left room ${roomId}`);
+                    // room.removePlayer(playerId);
+                    room.handleDisconnect(playerId);
+                    console.log(`❌ Player ${playerId} disconnected (Grace period started)`);
 
-                    if (room.players.length === 0) {
-                        roomManager.removeRoom(roomId);
-                    } else {
-                        room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                    // Clean up room only if EVERYONE is gone (no one active)
+                    const activePlayers = room.players.filter(p => p.isConnected);
+                    if (room.players.length === 0 || (activePlayers.length === 0 && room.players.length === 0)) {
+                        // Actually, we should probably keep the room alive if people are in grace period?
+                        // For now, let's keep it simple: If players array empty -> delete.
+                        // But wait, handleDisconnect doesn't remove from array.
+                        // So checking room.players.length is correct to keep it alive.
                     }
+                    // We rely on the timer in Room.ts to eventually removePlayer -> which might empty the room.
+                    // Accessing room manager from here to delete empty room might be tricky if done inside Room.ts
+                    // But for now, we just don't delete immediately on disconnect.
                 }
                 // Cleanup session
                 activeSessions.delete(ws.id);

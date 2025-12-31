@@ -21,12 +21,64 @@ export class Room {
 
     addPlayer(id: string, name: string, ws: any): Player {
         const isHost = this.players.length === 0;
-        const player: Player = { id, name, isHost, ws };
+        const token = crypto.randomUUID();
+        const player: Player = {
+            id,
+            name,
+            isHost,
+            ws,
+            token,
+            isConnected: true
+        };
         this.players.push(player);
         return player;
     }
 
+    handleDisconnect(id: string) {
+        const player = this.players.find(p => p.id === id);
+        if (!player) return;
+
+        player.isConnected = false;
+
+        // Start Grace Period Timer (60s)
+        if (player.disconnectTimeout) clearTimeout(player.disconnectTimeout);
+        player.disconnectTimeout = setTimeout(() => {
+            console.log(`⏰ Grace period expired for ${player.name} (${player.id})`);
+            this.removePlayer(player.id);
+            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+        }, 60000);
+
+        this.broadcast({ type: 'PLAYER_DC', payload: { playerId: id } });
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+    }
+
+    reconnectPlayer(token: string, ws: any): Player | null {
+        const player = this.players.find(p => p.token === token);
+        if (!player) return null;
+
+        // Cancel Timer
+        if (player.disconnectTimeout) {
+            clearTimeout(player.disconnectTimeout);
+            player.disconnectTimeout = undefined;
+        }
+
+        // Update Connection
+        player.ws = ws;
+        player.isConnected = true;
+
+        this.broadcast({ type: 'PLAYER_RECONNECTED', payload: { playerId: player.id } });
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+
+        return player;
+    }
+
     removePlayer(id: string) {
+        // Clear any pending timer
+        const player = this.players.find(p => p.id === id);
+        if (player && player.disconnectTimeout) {
+            clearTimeout(player.disconnectTimeout);
+        }
+
         this.players = this.players.filter(p => p.id !== id);
         if (this.players.length > 0 && !this.players.some(p => p.isHost)) {
             // Assign new host if host left
@@ -296,7 +348,7 @@ export class Room {
         return {
             code: this.code,
             gameState: this.gameState,
-            players: this.players.map(({ ws, ...rest }) => ({
+            players: this.players.map(({ ws, disconnectTimeout, ...rest }) => ({
                 ...rest,
                 cardCount: this.hands.get(rest.id)?.length || 0
             })),

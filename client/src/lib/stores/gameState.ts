@@ -43,6 +43,19 @@ function createGameState() {
         setBoard: (board: Card[]) => update(s => ({ ...s, board })),
         setError: (error: string) => update(s => ({ ...s, error })),
         setRoundResult: (result: 'WIN' | 'LOSS', board: Card[]) => update(s => ({ ...s, gameState: 'ROUND_END', roundResult: result, board, lastRoundLevel: s.level })),
+        setFullState: (state: RoomState, hand: Card[], playerId: string) => update(s => ({
+            ...s,
+            players: state.players,
+            gameState: state.gameState,
+            board: state.board || [],
+            topic: state.topic,
+            level: state.level,
+            readyCount: state.readyCount,
+            hand: hand,
+            roomCode: state.code,
+            playerId: playerId,
+            isConnected: true
+        })),
         reset: () => set(initialState)
     };
 }
