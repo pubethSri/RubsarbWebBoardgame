@@ -1,0 +1,376 @@
+# AI Checkpoint Sync - Rubsarb Project
+**Status**: Iteration 3 Complete. Preparing for Iteration 4 (Session Persistence).
+**Time**: 2025-12-31
+
+---
+
+## 1. Project Structure (Tree)
+```
+client/src
+client/src/App.svelte
+client/src/app.css
+client/src/assets
+client/src/assets/svelte.svg
+client/src/lib
+client/src/lib/Counter.svelte
+client/src/lib/stores
+client/src/lib/types.ts
+client/src/main.ts
+client/src/views
+client/src/views/Landing.svelte
+client/src/views/Lobby.svelte
+client/src/views/Game.svelte
+client/src/views/Result.svelte
+client/src/components
+client/src/components/Card.svelte
+client/src/components/Hand.svelte
+client/src/components/Board.svelte
+server/src
+server/src/index.ts
+server/src/types.ts
+server/src/Room.ts
+server/src/RoomManager.ts
+server/src/topics.yaml
+server/src/TopicManager.ts
+```
+
+---
+
+## 2. Server Entry (`server/src/index.ts`)
+```typescript
+import { Elysia } from "elysia";
+import { RoomManager } from './RoomManager';
+import type { WsMessage } from './types';
+
+const roomManager = new RoomManager();
+
+const activeSessions = new Map<string, { roomId: string, playerId: string }>();
+
+const app = new Elysia()
+    .ws('/ws', {
+        open(ws) {
+            console.log('✨ Client connected:', ws.id);
+        },
+        message(ws, message: any) {
+            // Parse message if it's a string, otherwise cast it
+            const msg: WsMessage = typeof message === 'string' ? JSON.parse(message) : message;
+            const session = activeSessions.get(ws.id);
+            const prefix = session ? `[Room ${session.roomId}] ` : `[Unknown] `;
+            console.log(`${prefix}📩 Received:`, msg);
+
+            if (msg.type === 'CREATE_ROOM') {
+                const room = roomManager.createRoom();
+                const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
+
+                // Store session in local Map
+                activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
+
+                ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id } }));
+                room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+            }
+
+            if (msg.type === 'MOVE_CARD') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        const { cardId, targetIndex } = msg.payload;
+                        room.moveCard(cardId, targetIndex);
+                    }
+                }
+            }
+
+            if (msg.type === 'RETURN_CARD') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.returnCard(msg.payload.cardId);
+                    }
+                }
+            }
+
+            if (msg.type === 'UPDATE_NOTE') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        const { cardId, note } = msg.payload;
+                        room.updateNote(cardId, note);
+                    }
+                }
+            }
+
+            if (msg.type === 'JOIN_ROOM') {
+                const room = roomManager.getRoom(msg.payload.roomCode);
+                if (room) {
+                    const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
+
+                    // Store session in local Map
+                    activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
+
+                    ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id } }));
+                    room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                } else {
+                    ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Room not found' } }));
+                }
+            }
+
+            if (msg.type === 'LEAVE_ROOM') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const { roomId, playerId } = session;
+                    const room = roomManager.getRoom(roomId);
+                    if (room) {
+                        room.removePlayer(playerId);
+                        console.log(`🚪 Player ${playerId} manually left room ${roomId}`);
+                        if (room.players.length === 0) {
+                            roomManager.removeRoom(roomId);
+                        } else {
+                            room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                        }
+                    }
+                    activeSessions.delete(ws.id);
+                }
+            }
+
+            if (msg.type === 'START_GAME') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const { roomId, playerId } = session;
+                    const room = roomManager.getRoom(roomId);
+                    if (room) {
+                        // verify host
+                        const player = room.players.find(p => p.id === playerId);
+                        if (player && player.isHost) {
+                            room.startGame();
+                            console.log(`🎮 Game started in room ${roomId} by ${playerId}`);
+                        }
+                    }
+                }
+            }
+
+            if (msg.type === 'UPDATE_BOARD') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        // Ideally validate that the move is legal (player owns the card?)
+                        // For Iteration 2 prototype: Trust client for DnD sync
+                        room.updateBoard(msg.payload.board);
+                    }
+                }
+            }
+
+            if (msg.type === 'REVEAL_NEXT') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const player = roomManager.getRoom(session.roomId)?.players.find(p => p.id === session.playerId);
+                    if (player && player.isHost) {
+                        const room = roomManager.getRoom(session.roomId);
+                        // @ts-ignore
+                        room.revealNext();
+                    }
+                }
+            }
+
+            if (msg.type === 'PLAYER_READY') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.handleReady(session.playerId);
+                    }
+                }
+            }
+        },
+        close(ws) {
+            const session = activeSessions.get(ws.id);
+
+            if (session) {
+                const { roomId, playerId } = session;
+                console.log(`🔌 Disconnect event for player ${playerId} in room ${roomId}`);
+
+                const room = roomManager.getRoom(roomId);
+                if (room) {
+                    room.removePlayer(playerId);
+                    console.log(`❌ Player ${playerId} left room ${roomId}`);
+
+                    if (room.players.length === 0) {
+                        roomManager.removeRoom(roomId);
+                    } else {
+                        room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                    }
+                }
+                // Cleanup session
+                activeSessions.delete(ws.id);
+            } else {
+                console.log(`⚠️ Unknown client disconnected (id: ${ws.id})`);
+            }
+        }
+    })
+    .get("/", () => "Rubsarb API is running...")
+    .listen(3000);
+
+console.log(
+    `🦊 Rubsarb Server is running at ${app.server?.hostname}:${app.server?.port}`
+);
+```
+
+---
+
+## 3. Game View (`client/src/views/Game.svelte`)
+```svelte
+<script lang="ts">
+    import Board from "../components/Board.svelte";
+    import Hand from "../components/Hand.svelte";
+    import Result from "./Result.svelte";
+    import { gameState } from "../lib/stores/gameState";
+    import { socketStore } from "../lib/stores/socket";
+</script>
+
+<div class="min-h-screen bg-white text-black relative overflow-hidden">
+    {#if $gameState.gameState === "ROUND_END"}
+        <Result
+            result={$gameState.roundResult || "WIN"}
+            finalBoard={$gameState.board}
+            topic={$gameState.topic}
+            level={$gameState.lastRoundLevel}
+            readyCount={$gameState.readyCount}
+            playerCount={$gameState.players.length}
+        />
+    {:else}
+        <!-- Header info -->
+        <div
+            class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10"
+        >
+            <div class="font-bold text-xl tracking-tight">Rubsarb</div>
+
+            <div class="flex gap-4 items-center">
+                {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
+                    {@const allCardsPlaced = $gameState.players.every(
+                        (p) => (p.cardCount ?? 0) === 0,
+                    )}
+                    <button
+                        onclick={() =>
+                            socketStore.sendMessage({
+                                type: "REVEAL_NEXT",
+                                payload: null,
+                            })}
+                        disabled={!allCardsPlaced}
+                        class="px-4 py-1 rounded-lg bg-black text-white font-bold border-2 border-black hover:scale-105 transition-transform shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-0.5 cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+                        title={!allCardsPlaced
+                            ? "Wait for all players to place cards"
+                            : "Reveal next card"}
+                    >
+                        Reveal Next
+                    </button>
+                {/if}
+
+                <div
+                    class="px-4 py-1 border-2 border-black rounded-lg font-mono text-sm font-bold bg-white"
+                >
+                    Level {$gameState.level}
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Container with padding for header -->
+        <div
+            class="w-full h-screen pt-20 pb-32 flex flex-col items-center overflow-y-auto"
+        >
+            <!-- Topic Display -->
+            {#if $gameState.topic}
+                <div
+                    class="flex flex-col items-center justify-center p-4 pointer-events-none mb-4"
+                >
+                    <h1
+                        class="text-3xl font-black text-center uppercase tracking-widest leading-tight max-w-4xl"
+                    >
+                        {$gameState.topic.text}
+                    </h1>
+                    <div
+                        class="flex gap-16 mt-2 text-xs font-bold font-mono text-gray-400 uppercase tracking-widest"
+                    >
+                        <span>1 = {$gameState.topic.minRange}</span>
+                        <span>100 = {$gameState.topic.maxRange}</span>
+                    </div>
+                </div>
+            {/if}
+
+            <!-- Game Area -->
+            <Board />
+        </div>
+
+        <!-- Player Hand -->
+        <Hand />
+    {/if}
+</div>
+```
+
+---
+
+## 4. GEMINI.md Status
+(Content from `ai_context/GEMINI.md` - Iteration 3 Complete, Iteration 4 Planned)
+
+---
+
+## 5. Refined Session Management Plan (Iteration 4)
+
+### A. The "Wristband" Concept
+- **Identity**: Users are identified by a `token` (UUID) stored in their browser's `localStorage` + the `roomId`.
+- **Scope**: Authenticated only within that specific room.
+
+### B. Lifecycle & Edge Cases
+
+#### 1. Initial Connection
+- **Flow**: User sends `JOIN_ROOM`.
+- **Server**:
+  - Generates `token`.
+  - Maps `token` -> `roomId` in a global `playerSessions` map.
+  - Adds player to `Room`.
+- **Client**: Stores `token`.
+
+#### 2. Disconnection (The Grace Period)
+- **Trigger**: WebSocket closes (Tab close, Network loss).
+- **Server**:
+  - **Do NOT** remove player immediately.
+  - Set `player.isConnected = false`.
+  - Start `disconnectTimer` (60s).
+  - Notify room: `PLAYER_DC` (UI: Gray out avatar).
+
+#### 3. Reconnection (Resume)
+- **Trigger**: User reopens tab / refreshes.
+- **Client**: Sends `RECONNECT` with stored `token` + `roomId`.
+- **Server**:
+  - Validates `token`.
+  - Cancels `disconnectTimer`.
+  - Updates `player.ws` to new socket.
+  - Sets `player.isConnected = true`.
+  - **SYNC**: Sends `WELCOME_BACK` with the **current** room state (Board, Hand, Topic).
+    - *Note*: The state might have changed while user was away (cards moved by others). User receives the latest, authoritative state.
+
+#### 4. Room Hopping (Constraint)
+- **Scenario**: User is in Room A (Alive or Disconnected), tries to join Room B.
+- **Rule**: **Single Active Session**.
+- **Logic**:
+  - If `token` exists in `playerSessions`:
+    - Lookup `oldRoomId`.
+    - If `oldRoomId != newRoomId`:
+      - **Force Leave**: Call `oldRoom.removePlayer(token)` immediately. This kills any timers and cleans up Room A state.
+      - Proceed to join Room B.
+
+#### 5. Room Closure
+- **Trigger**: Last active player leaves, or `LEAVE_ROOM` triggers cleanup.
+- **Logic**:
+  - If `room.players.length === 0`:
+    - **Cleanup**: Iterate through any remaining "Disconnected/Grace Period" players.
+    - **Kill**: `clearTimeout` for all of them.
+    - **Delete**: Remove `token` keys from `playerSessions`.
+    - Destroy Room.
+
+### C. Implementation Steps
+1.  **Global Map**: Add `playerSessions = new Map<token, roomId>` in `RoomManager` (or `index.ts`).
+2.  **Room Logic**: Update `Room.ts` to handle `isConnected`, `timers`, and `reconnectPlayer`.
+3.  **Protocol**: Add `RECONNECT` handler in `index.ts`.
+4.  **Client**: Update `socket.ts` to check storage on mount and attempt reconnect.

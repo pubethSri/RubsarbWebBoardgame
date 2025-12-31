@@ -1,9 +1,44 @@
+# ---------------------------------
+# Dependencies
+# ---------------------------------
 node_modules/
-.env
-dist/
+# Local Bun install cache (if applicable)
 .bun/
-target/
+
+# ---------------------------------
+# Build Outputs & Artifacts
+# ---------------------------------
+# Svelte/Vite/Bun build outputs
+dist/
+build/
+.svelte-kit/
+.output/
+
+# ---------------------------------
+# Environment Variables
+# ---------------------------------
+# Protect secrets from being committed
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Keep example files
+!.env.example
+
+# ---------------------------------
+# Logs & Debugging
+# ---------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+bun.lockb.tmp
+
+# ---------------------------------
+# OS & IDE System Files
+# ---------------------------------
 .DS_Store
-ai_context/
-.agent/
-.shared
+Thumbs.db
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,32 @@
+# Architecture Update: Session & Room Lifecycle Management
+
+## 1. Global State Logic
+The `RoomManager` must maintain a Global Session Map:
+- `playerSessions`: Map<string, string> // Maps `UserToken` -> `RoomID`
+
+## 2. Handling "Room Hopping" (JOIN Request)
+When a user sends `JOIN_ROOM` with an existing `token`:
+1. Check `playerSessions.get(token)`.
+2. **IF** it returns a `previousRoomId` AND it is different from the new target room:
+   - Retrieve `previousRoom`.
+   - **CRITICAL:** Immediately call `previousRoom.removePlayer(token)`.
+     - This MUST `clearTimeout(disconnectTimer)` to kill the grace period.
+     - This MUST remove the player from the previous room's state.
+   - Update `playerSessions.set(token, newRoomId)`.
+
+## 3. Handling "Room Closure" (LEAVE Request)
+When a user sends `LEAVE_ROOM`:
+1. Remove user from room.
+2. Delete `playerSessions.delete(token)`.
+3. **CHECK:** `room.getActivePlayerCount()`.
+4. **IF** count < 1 (Room is empty of active players):
+   - **Purge Disconnected Players:** - Iterate through any remaining "Disconnected" players in that room.
+     - `clearTimeout()` for all of them.
+     - `playerSessions.delete(theirToken)` for all of them.
+   - **Destroy Room:** `rooms.delete(roomId)`.
+
+## 4. Frontend Logic (Round End View)
+- If `connectedPlayers.length < 2`:
+  - Change "Next Round" button to "Return to Main Menu".
+  - Show warning: "Not enough players to continue."
+  - Clicking "Return" triggers standard `LEAVE_ROOM` event.
