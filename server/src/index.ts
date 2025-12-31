@@ -1,6 +1,16 @@
 import { Elysia } from "elysia";
 import { RoomManager } from './RoomManager';
 import type { WsMessage } from './types';
+import { db } from './db';
+import { migrate } from './db/migrate';
+import { rateLimit } from './middleware/rateLimit';
+import { adminAuth } from './middleware/adminAuth';
+import { creatorAuth } from './middleware/creatorAuth';
+import { CreatePackSchema } from './schemas/topic';
+
+// Initialize Database & Run Migrations
+// The original `initDB()` call is removed as `db` is now imported directly.
+await migrate();
 
 const roomManager = new RoomManager();
 
@@ -204,6 +214,120 @@ const app = new Elysia()
         }
     })
     .get("/", () => "Rubsarb API is running...")
+    .post("/api/packs", ({ body, set }) => {
+        const result = CreatePackSchema.safeParse(body);
+        if (!result.success) {
+            set.status = 400;
+            return result.error.flatten();
+        }
+
+        const { name, author, topics } = result.data;
+        const packId = crypto.randomUUID();
+
+        try {
+            const insertPack = db.prepare(`
+                INSERT INTO packs (id, name, author, is_official) VALUES (?, ?, ?, 0)
+            `);
+            const updateShareCode = db.prepare("UPDATE packs SET share_code = ? WHERE id = ?");
+
+            const insertTopic = db.prepare(`
+                INSERT INTO topics (id, pack_id, topic, type, min_label, max_label) VALUES (?, ?, ?, ?, 'Min', 'Max')
+            `);
+
+            // Generate 6-char share code OUTSIDE transaction to be available for return
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            const transaction = db.transaction(() => {
+                insertPack.run(packId, name, author);
+                updateShareCode.run(code, packId);
+
+                for (const t of topics) {
+                    insertTopic.run(crypto.randomUUID(), packId, t.topic, t.type);
+                }
+            });
+
+            transaction();
+            console.log(`📦 New Pack Created: ${name} by ${author}`);
+            return { success: true, packId, shareCode: code };
+
+        } catch (e) {
+            console.error("Failed to insert pack:", e);
+            set.status = 500;
+            return "Database Error";
+        }
+    }, {
+        beforeHandle: [rateLimit, creatorAuth]
+    })
+    .post("/api/rooms/:id/pack", ({ params: { id }, body, set }) => {
+        const room = roomManager.getRoom(id);
+        if (!room) {
+            set.status = 404;
+            return "Room not found";
+        }
+
+        const { shareCode } = body as { shareCode: string };
+        if (!shareCode) {
+            set.status = 400;
+            return "Share code required";
+        }
+
+        try {
+            const pack = db.query("SELECT id, name FROM packs WHERE share_code = ?").get(shareCode.toUpperCase()) as { id: string, name: string } | null;
+
+            if (!pack) {
+                set.status = 404;
+                return "Pack not found";
+            }
+
+            room.setPack(pack.id, pack.name);
+            return { success: true, packName: pack.name };
+
+        } catch (e) {
+            set.status = 500;
+            return "Database Error";
+        }
+    })
+    .group("/api/admin", app => app
+        .derive(({ request }) => {
+            // Optional: shared derive logic
+        })
+        .guard({ beforeHandle: [adminAuth] }, app => app
+            .get("/packs", ({ set }) => {
+                try {
+                    // List all packs with topic count
+                    const packs = db.query(`
+                        SELECT p.id, p.name, p.author, p.share_code, p.is_official, p.created_at, COUNT(t.id) as topic_count
+                        FROM packs p
+                        LEFT JOIN topics t ON p.id = t.pack_id
+                        GROUP BY p.id
+                        ORDER BY p.created_at DESC
+                    `).all();
+                    return packs;
+                } catch (e) {
+                    set.status = 500;
+                    return "Database Error";
+                }
+            })
+            .delete("/packs/:id", ({ params: { id }, set }) => {
+                try {
+                    db.query("DELETE FROM packs WHERE id = ?").run(id);
+                    return { success: true, message: "Pack deleted" };
+                } catch (e) {
+                    set.status = 500;
+                    return "Database Error";
+                }
+            })
+            .get("/packs/:id/topics", ({ params: { id }, set }) => {
+                try {
+                    const topics = db.query("SELECT * FROM topics WHERE pack_id = ?").all(id);
+                    return topics;
+                } catch (e) {
+                    set.status = 500;
+                    return "Database Error";
+                }
+            })
+        )
+    )
     .listen(3000);
 
 console.log(

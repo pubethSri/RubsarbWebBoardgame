@@ -36,7 +36,9 @@ function createGameState() {
                 board: state.board || [],
                 topic: state.topic,
                 level: state.level,
-                readyCount: state.readyCount
+                readyCount: state.readyCount,
+                activePackName: state.activePackName,
+                activePackId: state.activePackId
             })),
         startGame: (hand: Card[], board: Card[]) => update(s => ({ ...s, gameState: 'PLAYING', hand, board, roundResult: null })),
         setHand: (hand: Card[]) => update(s => ({ ...s, hand })),

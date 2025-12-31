@@ -36,6 +36,8 @@ export interface RoomState {
     topic: Topic | null;
     level: number;
     readyCount: number;
+    activePackName?: string;
+    activePackId?: string;
 }
 
 export interface GameState {
@@ -52,6 +54,8 @@ export interface GameState {
     roundResult: 'WIN' | 'LOSS' | null;
     readyCount: number;
     lastRoundLevel: number;
+    activePackName?: string;
+    activePackId?: string;
 }
 
 export type WsMessage =

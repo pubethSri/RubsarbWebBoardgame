@@ -14,6 +14,8 @@ export class Room {
     private deck: number[] = [];
     private hands: Map<string, Card[]> = new Map();
     private readyPlayers: Set<string> = new Set();
+    public activePackId: string = "starter_pack";
+    public activePackName: string = "The Essentials";
 
     constructor(code: string) {
         this.code = code;
@@ -86,6 +88,12 @@ export class Room {
         }
     }
 
+    setPack(id: string, name: string) {
+        this.activePackId = id;
+        this.activePackName = name;
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+    }
+
     // --- Game Logic ---
 
     startGame() {
@@ -125,9 +133,9 @@ export class Room {
             this.hands.set(player.id, hand);
         });
 
-        const rawTopic = topicManager.getRandomTopic();
+        const rawTopic = topicManager.getRandomTopic(this.activePackId);
         this.topic = {
-            text: rawTopic.text,
+            text: rawTopic.topic,
             minRange: rawTopic.min_label,
             maxRange: rawTopic.max_label
         };
@@ -356,7 +364,9 @@ export class Room {
             topic: this.topic,
             version: this.version,
             level: this.level,
-            readyCount: this.readyPlayers.size
+            readyCount: this.readyPlayers.size,
+            activePackName: this.activePackName,
+            activePackId: this.activePackId
         };
     }
 }

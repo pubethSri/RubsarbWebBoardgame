@@ -5,6 +5,36 @@
 
     // No need for $state for store subscriptions in Svelte 5 if using auto-subscription in template
     // But we can derive values if needed.
+
+    let packShareCode = $state("");
+    let isChangingPack = $state(false);
+
+    async function changePack() {
+        if (!packShareCode || packShareCode.length < 6) return;
+        isChangingPack = true;
+        try {
+            const res = await fetch(`/api/rooms/${$gameState.roomCode}/pack`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ shareCode: packShareCode }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                packShareCode = "";
+                // Success msg or just let UI update
+            } else {
+                alert(
+                    typeof data === "string"
+                        ? data
+                        : data.message || "Failed to change pack",
+                );
+            }
+        } catch (e) {
+            alert("Network Error");
+        } finally {
+            isChangingPack = false;
+        }
+    }
 </script>
 
 <div class="flex flex-col items-center min-h-screen p-6 bg-white text-black">
@@ -27,6 +57,44 @@
     </div>
 
     <!-- Host Actions -->
+    <div
+        class="w-full max-w-2xl mb-8 flex flex-col items-center gap-4 bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-300"
+    >
+        <div class="flex flex-col items-center gap-1">
+            <span
+                class="text-xs uppercase font-bold text-gray-400 tracking-wider"
+                >Current Topic Pack</span
+            >
+            <span
+                class="text-xl font-black bg-black text-white px-3 py-1 rounded"
+            >
+                {$gameState.activePackName || "The Essentials"}
+            </span>
+        </div>
+
+        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
+            <div class="flex gap-2 w-full max-w-sm mt-2">
+                <input
+                    bind:value={packShareCode}
+                    placeholder="Enter Share Code..."
+                    class="flex-1 border-2 border-black rounded p-2 font-mono text-center uppercase focus:outline-none focus:ring-2 focus:ring-black placeholder:normal-case"
+                    maxlength="6"
+                />
+                <button
+                    onclick={changePack}
+                    disabled={isChangingPack || packShareCode.length < 6}
+                    class="bg-black text-white font-bold px-4 py-2 rounded hover:opacity-80 disabled:opacity-50"
+                >
+                    {isChangingPack ? "..." : "LOAD"}
+                </button>
+            </div>
+            <div class="text-[10px] text-gray-400">
+                Created a custom pack? Paste its 6-character code here.
+            </div>
+        {/if}
+    </div>
+
+    <!-- Start Game Button -->
     {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
         <div class="mb-8 w-full max-w-2xl flex justify-center">
             <button

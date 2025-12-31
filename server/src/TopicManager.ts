@@ -1,68 +1,44 @@
-import { parse } from 'yaml';
-import { join } from 'path';
-import { readFileSync } from 'fs';
+import { db } from './db';
 
 export interface TopicDef {
-    text: string;
+    topic: string;
     min_label: string;
     max_label: string;
 }
 
-export interface TopicPack {
-    id: string;
-    name: string;
-    description: string;
-    topics: TopicDef[];
-}
-
-export interface YamlSchema {
-    packs: TopicPack[];
-}
-
 export class TopicManager {
-    private topics: TopicDef[] = [];
-
     constructor() {
-        this.loadTopics();
+        this.logStats();
     }
 
-    private loadTopics() {
-        try {
-            // Adjust path: assume running from server root or src?
-            // Usually server/src/topics.yaml.
-            // If running with bun src/index.ts, cwd is server root.
-            const path = join(process.cwd(), 'src', 'topics.yaml');
-            const file = readFileSync(path, 'utf8');
-            const data = parse(file) as YamlSchema;
+    private logStats() {
+        const count = db.query("SELECT count(*) as count FROM topics").get() as { count: number };
+        console.log(`📚 TopicManager ready. Serving ${count.count} topics from SQLite.`);
+    }
 
-            // Flatten all topics from all packs (for now)
-            // Or just use "starter_pack" / "The Essentials"
-            const starterPack = data.packs.find(p => p.id === 'starter_pack');
-            if (starterPack) {
-                this.topics = starterPack.topics;
-            } else {
-                // Fallback: all topics
-                this.topics = data.packs.flatMap(p => p.topics);
+    getRandomTopic(packId: string = "starter_pack"): TopicDef {
+        try {
+            const topic = db.query(`
+                SELECT topic, min_label, max_label
+                FROM topics
+                WHERE pack_id = $packId
+                ORDER BY RANDOM()
+                LIMIT 1
+            `).get({ $packId: packId }) as TopicDef | null;
+
+            if (!topic) {
+                return { topic: "No topics found", min_label: "Error", max_label: "Error" };
             }
 
-            console.log(`📚 Loaded ${this.topics.length} topics.`);
+            // Handle potentially null labels if DB schema allows it (though we inserted strings)
+            return {
+                topic: topic.topic,
+                min_label: topic.min_label || "Min",
+                max_label: topic.max_label || "Max"
+            };
         } catch (e) {
-            console.error("Failed to load topics.yaml:", e);
-            // Fallback topic
-            this.topics = [{
-                text: "Failed to load topics",
-                min_label: "Error",
-                max_label: "Error"
-            }];
+            console.error("DB Error in getRandomTopic:", e);
+            return { topic: "Database Error", min_label: "Error", max_label: "Error" };
         }
-    }
-
-    getRandomTopic(): TopicDef {
-        if (this.topics.length === 0) {
-            return { text: "No Topics Available", min_label: "?", max_label: "?" };
-        }
-        const index = Math.floor(Math.random() * this.topics.length);
-        return this.topics[index]!;
     }
 }
-

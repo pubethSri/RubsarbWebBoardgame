@@ -34,6 +34,8 @@ export interface RoomState {
     version: number;
     level: number;
     readyCount: number;
+    activePackName?: string;
+    activePackId?: string;
 }
 
 export type WsMessage =
