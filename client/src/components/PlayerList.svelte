@@ -1,5 +1,6 @@
 <script lang="ts">
     import { gameState } from "../lib/stores/gameState";
+    import { socketStore } from "../lib/stores/socket";
     import { slide } from "svelte/transition";
     import {
         Users,
@@ -7,6 +8,7 @@
         WifiOff,
         ChevronDown,
         ChevronUp,
+        LogOut,
     } from "lucide-svelte"; // Assuming lucide-svelte is available or we use SVGs
 
     let isOpen = false;
@@ -101,6 +103,16 @@
                         {/if}
                     </div>
                 {/each}
+            </div>
+            
+            <div class="p-2 border-t-2 border-black bg-gray-50">
+                <button
+                    onclick={() => socketStore.disconnect()}
+                    class="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 border border-red-200 rounded hover:bg-red-50 hover:border-red-400 transition-colors"
+                >
+                    <LogOut size={14} />
+                    Leave Room
+                </button>
             </div>
         </div>
     {/if}
