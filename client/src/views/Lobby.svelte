@@ -36,7 +36,10 @@
                         payload: null,
                     })}
                 class="px-8 py-4 rounded-xl bg-black text-white border-2 border-black font-bold text-2xl hover:scale-105 transition-transform cursor-pointer shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={$gameState.players.length < 1}
+                disabled={$gameState.players.length < 2}
+                title={$gameState.players.length < 2
+                    ? "Need at least 2 players"
+                    : "Start Game"}
             >
                 START GAME
             </button>

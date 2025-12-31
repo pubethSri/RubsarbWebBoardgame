@@ -13,7 +13,11 @@ const initialState: GameStore = {
     board: [],
     hand: [],
     topic: null,
-    error: null
+    error: null,
+    level: 1,
+    roundResult: null,
+    readyCount: 0,
+    lastRoundLevel: 1
 };
 
 function createGameState() {
@@ -30,12 +34,15 @@ function createGameState() {
                 players: state.players,
                 gameState: state.gameState,
                 board: state.board || [],
-                topic: state.topic
+                topic: state.topic,
+                level: state.level,
+                readyCount: state.readyCount
             })),
-        startGame: (hand: Card[], board: Card[]) => update(s => ({ ...s, gameState: 'PLAYING', hand, board })),
+        startGame: (hand: Card[], board: Card[]) => update(s => ({ ...s, gameState: 'PLAYING', hand, board, roundResult: null })),
         setHand: (hand: Card[]) => update(s => ({ ...s, hand })),
         setBoard: (board: Card[]) => update(s => ({ ...s, board })),
         setError: (error: string) => update(s => ({ ...s, error })),
+        setRoundResult: (result: 'WIN' | 'LOSS', board: Card[]) => update(s => ({ ...s, gameState: 'ROUND_END', roundResult: result, board, lastRoundLevel: s.level })),
         reset: () => set(initialState)
     };
 }

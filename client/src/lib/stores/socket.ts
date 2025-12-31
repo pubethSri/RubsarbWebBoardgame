@@ -29,6 +29,9 @@ export const socketStore = {
                     case 'GAME_STARTED':
                         gameState.startGame(msg.payload.hand, msg.payload.board);
                         break;
+                    case 'ROUND_ENDED':
+                        gameState.setRoundResult(msg.payload.result, msg.payload.board);
+                        break;
                     case 'ERROR':
                         gameState.setError(msg.payload.message);
                         break;

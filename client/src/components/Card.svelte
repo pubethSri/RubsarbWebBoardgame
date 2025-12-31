@@ -54,13 +54,14 @@
             class="w-full h-8 border-t-2 border-black bg-yellow-50 text-black flex items-center justify-center p-0.5"
         >
             {#if canEdit}
-                <textarea
-                    class="w-full h-full bg-transparent resize-none text-xs text-center border-none focus:ring-0 p-0 leading-tight placeholder-gray-400 font-sans"
+                <input
+                    type="text"
+                    class="w-full h-full bg-transparent text-xs text-center border-none focus:ring-0 p-0 placeholder-gray-400 font-sans"
                     placeholder="Note..."
                     bind:value={noteValue}
                     onblur={handleBlur}
                     onpointerdown={(e) => e.stopPropagation()}
-                ></textarea>
+                />
             {:else}
                 <div
                     class="w-full h-full flex items-center justify-center text-xs text-center p-0 font-sans truncate px-1"

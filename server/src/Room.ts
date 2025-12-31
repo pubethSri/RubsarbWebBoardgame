@@ -10,8 +10,10 @@ export class Room {
     public board: Card[] = [];
     public topic: Topic | null = null;
     public version: number = 0;
+    public level: number = 1;
     private deck: number[] = [];
     private hands: Map<string, Card[]> = new Map();
+    private readyPlayers: Set<string> = new Set();
 
     constructor(code: string) {
         this.code = code;
@@ -35,12 +37,14 @@ export class Room {
     // --- Game Logic ---
 
     startGame() {
-        if (this.players.length < 1) return;
+        if (this.players.length < 2) return;
 
         this.gameState = 'PLAYING';
         this.deck = Array.from({ length: 100 }, (_, i) => i + 1);
         this.hands.clear();
         this.version = 0; // Reset version on game start
+        this.board = []; // Reset board
+        this.readyPlayers.clear();
 
         // Shuffle
         for (let i = this.deck.length - 1; i > 0; i--) {
@@ -49,17 +53,22 @@ export class Room {
             [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
         }
 
-        // Deal 1 card (Level 1)
+        // Deal cards based on LEVEL
+        // Level 1 = 1 card, Level 2 = 2 cards, etc.
+        const cardsPerPlayer = this.level;
+
         this.players.forEach(player => {
             const hand: Card[] = [];
-            const val = this.deck.pop();
-            if (val) {
-                hand.push({
-                    id: crypto.randomUUID(),
-                    value: val,
-                    playerId: player.id,
-                    isFaceUp: false
-                });
+            for (let i = 0; i < cardsPerPlayer; i++) {
+                const val = this.deck.pop();
+                if (val) {
+                    hand.push({
+                        id: crypto.randomUUID(),
+                        value: val,
+                        playerId: player.id,
+                        isFaceUp: false
+                    });
+                }
             }
             this.hands.set(player.id, hand);
         });
@@ -84,6 +93,17 @@ export class Room {
 
         // Also broadcast generic room update so lobby UI switches
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+    }
+
+    handleReady(playerId: string) {
+        this.readyPlayers.add(playerId);
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+
+        // Check if all players are ready
+        if (this.readyPlayers.size === this.players.length) {
+            console.log(`[Room ${this.code}] All players ready! Starting Round (Level ${this.level})`);
+            this.startGame();
+        }
     }
 
     broadcast(message: WsResponse) {
@@ -228,23 +248,26 @@ export class Room {
             const card = this.board[nextHiddenIndex];
             // @ts-ignore
             card.isFaceUp = true;
+            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
 
             // Logic: Check if Ascending
-            // If index > 0, check if this card < previous card
             if (nextHiddenIndex > 0) {
                 const prevCard = this.board[nextHiddenIndex - 1];
                 // @ts-ignore
                 if (card.value < prevCard.value) {
-                    console.log("❌ FAIL: Order broken!");
-                    // For now, just log and continue revealing? 
-                    // Or trigger ROUND_END? The original spec says "Round Over Immediately".
-                    // Let's mark game as ROUND_END maybe?
-                    // For this Iteration, let's just flip it and maybe send a special alert?
-                    // We'll leave the state as PLAYING but maybe the UI detects the red flag?
+                    console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
+                    this.gameState = 'ROUND_END';
+                    // Reveal ALL remaining cards
+                    this.board.forEach(c => c.isFaceUp = true);
+
+                    this.broadcast({
+                        type: 'ROUND_ENDED',
+                        payload: { result: 'LOSS', board: this.board }
+                    });
+                    // DO NOT increment Level. Voting "Ready" will restart same level.
+                    return;
                 }
             }
-
-            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
 
             // Check if ALL cards are now revealed
             const allRevealed = this.board.every(c => c.isFaceUp);
@@ -254,9 +277,16 @@ export class Room {
 
                 if (isSorted) {
                     console.log("✅ SUCCESS: All cards revealed in ascending order!");
-                    // TODO: Trigger round win state/animation in future
+                    this.gameState = 'ROUND_END';
+                    this.level++; // Increment Level
+
+                    this.broadcast({
+                        type: 'ROUND_ENDED',
+                        payload: { result: 'WIN', board: this.board }
+                    });
                 } else {
                     console.log("⚠️ GAME OVER: All cards revealed but order is wrong.");
+                    // Should be caught above, but safe fallback
                 }
             }
         }
@@ -272,7 +302,9 @@ export class Room {
             })),
             board: this.board,
             topic: this.topic,
-            version: this.version
+            version: this.version,
+            level: this.level,
+            readyCount: this.readyPlayers.size
         };
     }
 }

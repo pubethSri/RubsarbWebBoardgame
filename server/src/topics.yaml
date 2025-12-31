@@ -7,7 +7,7 @@ packs:
         min_label: "Not Spicy"
         max_label: "Hell"
       
-      - text: "Popular Movies"
+      - text: "Popular Movie"
         min_label: "Worst Movie Ever"
         max_label: "Masterpiece"
       
@@ -18,26 +18,54 @@ packs:
       - text: "Useful items in a zombie apocalypse"
         min_label: "Useless"
         max_label: "Essential"
-
-  - id: "social_chaos"
-    name: "Social Chaos"
-    description: "Topics designed to start arguments and expose your friends."
-    topics:
-      - text: "A place for a First Date"
-        min_label: "Immediate Breakup"
-        max_label: "Wedding Bells"
       
+      - text: "A creature to keep as a pet"
+        min_label: "Lame"
+        max_label: "Legendary"
+
+      - text: "Superhero Name"
+        min_label: "Cringe"
+        max_label: "Badass"
+
+      - text: "Activity if you were a bird"
+        min_label: "Boring"
+        max_label: "Majestic"
+
+      - text: "Beverage"
+        min_label: "Yucky"
+        max_label: "Delicious"
+
+      - text: "People or things you'd want on a deserted island with you"
+        min_label: "Not Effective"
+        max_label: "Essential"
+
+      - text: "Something caught while fishing"
+        min_label: "Useless"
+        max_label: "Priceless"
+
+      - text: "Things to do at a restaurant"
+        min_label: "Rude"
+        max_label: "Classy"
+
+      - text: "Things to do at a museum"
+        min_label: "Banned"
+        max_label: "Inspiring"
+
+      - text: "Things to do at an art gallery"
+        min_label: "Get kicked out"
+        max_label: "Inspiring"
+
+      - text: "Things to do at an aquarium"
+        min_label: "Disturbing"
+        max_label: "Fun"
+
+      - text: "Things to do in a crowded elevator"
+        min_label: "Psychotic"
+        max_label: "Courteous"
+
       - text: "Things you want to find in your pocket"
         min_label: "Terrifying"
         max_label: "Made your day"
-
-  - id: "fantasy_scenarios"
-    name: "Isekai & Fantasy"
-    description: "For the geeks and dreamers."
-    topics:
-      - text: "Powerful Superpowers"
-        min_label: "Useless"
-        max_label: "Strongest"
       
       - text: "Useful Items for fighting dragons"
         min_label: "Useless"

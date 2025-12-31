@@ -32,6 +32,8 @@ export interface RoomState {
     gameState: GameStatus;
     board: Card[];
     topic: Topic | null;
+    level: number;
+    readyCount: number;
 }
 
 export interface GameState {
@@ -44,6 +46,10 @@ export interface GameState {
     hand: Card[];
     topic: Topic | null;
     error: string | null;
+    level: number;
+    roundResult: 'WIN' | 'LOSS' | null;
+    readyCount: number;
+    lastRoundLevel: number;
 }
 
 export type WsMessage =
@@ -55,10 +61,12 @@ export type WsMessage =
     | { type: 'RETURN_CARD'; payload: { cardId: string } }
     | { type: 'UPDATE_NOTE'; payload: { cardId: string; note: string } }
     | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
-    | { type: 'REVEAL_NEXT'; payload: null }; // New Reveal action
+    | { type: 'REVEAL_NEXT'; payload: null }
+    | { type: 'PLAYER_READY'; payload: null };
 
 export type WsResponse =
     | { type: 'ROOM_UPDATED'; payload: RoomState }
     | { type: 'ERROR'; payload: { message: string } }
     | { type: 'JOINED_ROOM'; payload: { code: string; playerId: string } }
-    | { type: 'GAME_STARTED'; payload: { hand: Card[]; board: Card[] } };
+    | { type: 'GAME_STARTED'; payload: { hand: Card[]; board: Card[] } }
+    | { type: 'ROUND_ENDED'; payload: { result: 'WIN' | 'LOSS'; board: Card[] } };

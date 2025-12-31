@@ -14,7 +14,9 @@ const app = new Elysia()
         message(ws, message: any) {
             // Parse message if it's a string, otherwise cast it
             const msg: WsMessage = typeof message === 'string' ? JSON.parse(message) : message;
-            console.log('📩 Received:', msg);
+            const session = activeSessions.get(ws.id);
+            const prefix = session ? `[Room ${session.roomId}] ` : `[Unknown] `;
+            console.log(`${prefix}📩 Received:`, msg);
 
             if (msg.type === 'CREATE_ROOM') {
                 const room = roomManager.createRoom();
@@ -128,6 +130,16 @@ const app = new Elysia()
                         const room = roomManager.getRoom(session.roomId);
                         // @ts-ignore
                         room.revealNext();
+                    }
+                }
+            }
+
+            if (msg.type === 'PLAYER_READY') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.handleReady(session.playerId);
                     }
                 }
             }
