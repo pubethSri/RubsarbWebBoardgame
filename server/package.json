@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",
+    "@elysiajs/static": "^1.4.7",
     "elysia": "^1.4.19",
     "yaml": "^2.8.2",
     "zod": "^4.3.2"

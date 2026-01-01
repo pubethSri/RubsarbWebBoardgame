@@ -7,6 +7,7 @@ import { rateLimit } from './middleware/rateLimit';
 // import { adminAuth } from './middleware/adminAuth';
 // import { creatorAuth } from './middleware/creatorAuth';
 import { AuthUtils, authMiddleware } from './auth';
+import { staticPlugin } from "@elysiajs/static";
 import { CreatePackSchema } from './schemas/topic';
 
 // Initialize Database & Run Migrations
@@ -18,6 +19,25 @@ const roomManager = new RoomManager();
 const activeSessions = new Map<string, { roomId: string, playerId: string }>();
 
 const app = new Elysia()
+    // Serve Static Assets Manually (Docker specific fix)
+    .get("/assets/*", ({ params }) => {
+        const filePath = process.env.NODE_ENV === 'production'
+            ? `/app/client/dist/assets/${params['*']}`
+            : `../client/dist/assets/${params['*']}`;
+        return Bun.file(filePath);
+    })
+    .get("/index.html", () => {
+        const filePath = process.env.NODE_ENV === 'production'
+            ? `/app/client/dist/index.html`
+            : `../client/dist/index.html`;
+        return Bun.file(filePath);
+    })
+    .get("/", () => {
+        const filePath = process.env.NODE_ENV === 'production'
+            ? `/app/client/dist/index.html`
+            : `../client/dist/index.html`;
+        return Bun.file(filePath);
+    })
     .ws('/ws', {
         open(ws) {
             console.log('✨ Client connected:', ws.id);
@@ -218,7 +238,7 @@ const app = new Elysia()
             }
         }
     })
-    .get("/", () => "Rubsarb API is running...")
+
     .group("/api/auth", app => app
         .post("/login", async ({ body, set }) => {
             const { username, password } = body as any;
@@ -382,7 +402,10 @@ const app = new Elysia()
             })
         )
     )
-    .listen(3000);
+    .listen({
+        port: process.env.PORT || 3000,
+        hostname: '0.0.0.0'
+    });
 
 console.log(
     `🦊 Rubsarb Server is running at ${app.server?.hostname}:${app.server?.port}`

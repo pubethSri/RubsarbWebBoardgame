@@ -7,10 +7,10 @@
   import Game from "./views/Game.svelte";
 
   onMount(() => {
-    // Connect to the Elysia server (Dynamically use the same IP as frontend)
+    // Connect to the Elysia server (Relative path handles both Dev Proxy and Prod)
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname;
-    socketStore.connect(`${protocol}//${host}:3000/ws`);
+    const host = window.location.host; // Includes port if present
+    socketStore.connect(`${protocol}//${host}/ws`);
   });
 </script>
 
