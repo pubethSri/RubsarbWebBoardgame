@@ -18,11 +18,8 @@ Built with **Bun**, **Elysia.js**, and **Svelte**, styled with a strict **Monoch
 ## ✨ Features
 
 *   **Real-Time Multiplayer**: Instant interaction using WebSockets.
-*   **Custom Topic Packs**: Create and share your own themes (e.g., "Spicy Foods", "Scary Movies").
-*   **Monochrome UI**: A sleek, high-contrast Black & White design system.
-*   **Lobby System**: Room codes, host controls, and a strict 8-player limit.
-*   **Admin Dashboard**: Manage community packs and content moderation.
-*   **Local Auth**: Built-in authentication for Creators and Admins using SQLite.
+*   **Custom Topic Packs**: Create and share your own themes (e.g., "Spicy Foods", "Scary Movies"). [Not available for normal user yet.]
+*   **Lobby System**: Room codes and Custom packs code.
 
 ## 🛠️ Tech Stack
 
@@ -32,73 +29,6 @@ Built with **Bun**, **Elysia.js**, and **Svelte**, styled with a strict **Monoch
 *   **Database**: SQLite (via `bun:sqlite`)
 *   **Styling**: TailwindCSS
 *   **Icons**: Lucide Svelte
-
-## 🚀 Getting Started
-
-### Prerequisites
-*   [Bun](https://bun.sh) installed.
-
-### Installation
-
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/yourusername/rubsarb.git
-    cd rubsarb
-    ```
-
-2.  **Install Dependencies**:
-    ```bash
-    # Install root dependencies (concurrently, etc.)
-    bun install
-
-    # Install client & server dependencies
-    cd client && bun install
-    cd ../server && bun install
-    ```
-
-3.  **Environment Setup**:
-    Create a `.env` file in `server/`:
-    ```env
-    # server/.env
-    PORT=3000
-    JWT_SECRET=your_super_secret_key
-    ADMIN_PASSWORD=admin         # Initial Admin Seeding
-    CREATOR_PASSWORD=creator     # Initial Creator Seeding
-    ```
-
-4.  **Database Migration**:
-    Initialize the SQLite database and seed default users/packs:
-    ```bash
-    cd server
-    bun run src/db/seed_users.ts
-    ```
-
-### Running Development
-
-Run both Client and Server concurrently from the root:
-
-```bash
-bun start
-```
-*   **Frontend**: http://localhost:5173
-*   **Backend**: http://localhost:3000
-
-## 📦 Building for Production
-
-1.  **Build Frontend**:
-    ```bash
-    cd client
-    bun run build
-    ```
-    This generates static assets in `client/dist`.
-
-2.  **Serve**:
-    The backend is configured to serve the static frontend files from `client/dist`.
-    ```bash
-    cd server
-    bun start
-    ```
-    Access the game at `http://localhost:3000`.
 
 ## 📄 License
 
