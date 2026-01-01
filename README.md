@@ -19,46 +19,32 @@ The app is containerized using a multi-stage Dockerfile that builds the Frontend
 ### 1. Prerequisites
 - Docker Engine & Docker Compose installed.
 
-### 2. Quick Start
+### 2. Quick Start (Production)
+The default `docker-compose.yml` includes an **Nginx** reverse proxy listening on Port 80.
+
 ```bash
 # 1. Clone the repo
 git clone https://github.com/your-username/rubsarb.git
 cd rubsarb
 
-# 2. Build and run
+# 2. Setup Environment Variables
+cp .env.example .env
+# [IMPORTANT] Edit .env with your real JWT_SECRET and passwords!
+nano .env
+
+# 3. Build and Run
 docker-compose up -d --build
 ```
-Access the game at: `http://localhost:3000`
+Access the game at: `http://<_YOUR_SERVER_IP_>` (Standard Port 80)
 
-### 3. Database & Users
-The app uses **SQLite** persisted in `db_data/`.
-On the first run, you need to seed the initial users:
+### 3. Database Seeding (First Run Only)
+Users are not created automatically. Run this command once to generate the default Admin/Creator accounts:
 ```bash
-# Run the seed script inside the running container
 docker-compose exec app bun src/db/seed_users.ts
 ```
-**Default Credentials:**
+**Default Credentials** (if you didn't change passwords in .env):
 - `admin` / `admin`
 - `creator` / `creator`
-
-### 4. Running Behind Nginx (Recommended)
-For production (VM/VPS), run Nginx in front to handle Port 80/443.
-
-**Example Nginx Config:**
-```nginx
-server {
-    listen 80;
-    server_name play.yourdomain.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-    }
-}
-```
 
 ## 🛠️ Tech Stack
 *   **Runtime**: Bun
