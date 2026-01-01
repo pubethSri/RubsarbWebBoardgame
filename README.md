@@ -4,7 +4,7 @@
 
 Built with **Bun**, **Elysia.js**, and **Svelte**, styled with a strict **Monochrome** aesthetic.
 
-> **Note**: This game is heavily inspired by the mechanics of **[The Mind](https://boardgamegeek.com/boardgame/244992/the-mind)** (Wolfgang Warsch) and **[ito](https://boardgamegeek.com/boardgame/279537/ito)** (Arclight Games). It blends the intense non-verbal coordination of *The Mind* with the subjective "scale" discussions of *ito*.
+> **Note**: This game is heavily inspired by the mechanics of **[The Mind](https://boardgamegeek.com/boardgame/244992/the-mind)** (Wolfgang Warsch) and **[ito](https://boardgamegeek.com/boardgame/327778/ito)** (Arclight Games). It blends the intense non-verbal coordination of *The Mind* with the subjective "scale" discussions of *ito*.
 
 ---
 
