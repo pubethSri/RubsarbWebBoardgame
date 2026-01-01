@@ -4,8 +4,9 @@ import type { WsMessage } from './types';
 import { db } from './db';
 import { migrate } from './db/migrate';
 import { rateLimit } from './middleware/rateLimit';
-import { adminAuth } from './middleware/adminAuth';
-import { creatorAuth } from './middleware/creatorAuth';
+// import { adminAuth } from './middleware/adminAuth';
+// import { creatorAuth } from './middleware/creatorAuth';
+import { AuthUtils, authMiddleware } from './auth';
 import { CreatePackSchema } from './schemas/topic';
 
 // Initialize Database & Run Migrations
@@ -74,13 +75,17 @@ const app = new Elysia()
             if (msg.type === 'JOIN_ROOM') {
                 const room = roomManager.getRoom(msg.payload.roomCode);
                 if (room) {
-                    const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
+                    try {
+                        const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
 
-                    // Store session in local Map
-                    activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
+                        // Store session in local Map
+                        activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
 
-                    ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
-                    room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                        ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
+                        room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                    } catch (e: any) {
+                        ws.send(JSON.stringify({ type: 'ERROR', payload: { message: e.message || 'Failed to join room' } }));
+                    }
                 } else {
                     ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Room not found' } }));
                 }
@@ -214,7 +219,46 @@ const app = new Elysia()
         }
     })
     .get("/", () => "Rubsarb API is running...")
-    .post("/api/packs", ({ body, set }) => {
+    .group("/api/auth", app => app
+        .post("/login", async ({ body, set }) => {
+            const { username, password } = body as any;
+            if (!username || !password) {
+                set.status = 400;
+                return "Missing credentials";
+            }
+
+            const user = db.query("SELECT * FROM users WHERE username = ?").get(username) as any;
+            if (!user) {
+                set.status = 401;
+                return "Invalid credentials";
+            }
+
+            const isValid = await AuthUtils.verifyPassword(password, user.password);
+            if (!isValid) {
+                set.status = 401;
+                return "Invalid credentials";
+            }
+
+            const token = AuthUtils.createToken();
+            db.query("UPDATE users SET token = ? WHERE id = ?").run(token, user.id);
+
+            return { success: true, token, role: user.role, username: user.username };
+        })
+        .get("/me", ({ request, set }) => {
+            const token = request.headers.get("x-auth-token");
+            if (!token) { set.status = 401; return "No Token"; }
+            const user = AuthUtils.getUserByToken(token);
+            if (!user) { set.status = 401; return "Invalid Token"; }
+            return { username: user.username, role: user.role };
+        })
+    )
+    .post("/api/packs", ({ body, set, user }: any) => {
+        // Role Check
+        if (user.role !== 'CREATOR' && user.role !== 'ADMIN') {
+            set.status = 403;
+            return "Forbidden: Creators only";
+        }
+
         const result = CreatePackSchema.safeParse(body);
         if (!result.success) {
             set.status = 400;
@@ -256,7 +300,8 @@ const app = new Elysia()
             return "Database Error";
         }
     }, {
-        beforeHandle: [rateLimit, creatorAuth]
+        // @ts-ignore
+        beforeHandle: [rateLimit, authMiddleware]
     })
     .post("/api/rooms/:id/pack", ({ params: { id }, body, set }) => {
         const room = roomManager.getRoom(id);
@@ -291,7 +336,16 @@ const app = new Elysia()
         .derive(({ request }) => {
             // Optional: shared derive logic
         })
-        .guard({ beforeHandle: [adminAuth] }, app => app
+        .guard({ beforeHandle: [authMiddleware] }, app => app
+            .onBeforeHandle(({ request, set }) => {
+                // Double check admin role
+                // @ts-ignore
+                const user = AuthUtils.getUserByToken(request.headers.get("x-auth-token"));
+                if (!user || user.role !== 'ADMIN') {
+                    set.status = 403;
+                    return "Admins only";
+                }
+            })
             .get("/packs", ({ set }) => {
                 try {
                     // List all packs with topic count

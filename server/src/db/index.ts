@@ -29,6 +29,18 @@ export function initDB() {
             max_label TEXT,
             FOREIGN KEY(pack_id) REFERENCES packs(id) ON DELETE CASCADE
         );
+        );
+    `).run();
+
+    db.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'USER',
+            token TEXT,
+            created_at INTEGER DEFAULT (unixepoch())
+        );
     `).run();
 
     console.log("Database initialized (WAL mode enabled)");

@@ -2,12 +2,15 @@
     import { gameState } from "../lib/stores/gameState";
     import { socketStore } from "../lib/stores/socket";
     import { fade, fly } from "svelte/transition";
+    import HostGuideModal from "../components/HostGuideModal.svelte";
+    import { HelpCircle } from "lucide-svelte";
 
     // No need for $state for store subscriptions in Svelte 5 if using auto-subscription in template
     // But we can derive values if needed.
 
     let packShareCode = $state("");
     let isChangingPack = $state(false);
+    let showHostGuide = $state(false);
 
     async function changePack() {
         if (!packShareCode || packShareCode.length < 6) return;
@@ -62,34 +65,34 @@
     >
         <div class="flex flex-col items-center gap-1">
             <span
-                class="text-xs uppercase font-bold text-gray-400 tracking-wider"
+                class="text-xs uppercase font-bold text-gray-500 tracking-wider mb-2"
                 >Current Topic Pack</span
             >
             <span
-                class="text-xl font-black bg-black text-white px-3 py-1 rounded"
+                class="text-4xl font-black bg-black text-white px-6 py-4 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]"
             >
                 {$gameState.activePackName || "The Essentials"}
             </span>
         </div>
 
         {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
-            <div class="flex gap-2 w-full max-w-sm mt-2">
-                <input
-                    bind:value={packShareCode}
-                    placeholder="Enter Share Code..."
-                    class="flex-1 border-2 border-black rounded p-2 font-mono text-center uppercase focus:outline-none focus:ring-2 focus:ring-black placeholder:normal-case"
-                    maxlength="6"
-                />
-                <button
-                    onclick={changePack}
-                    disabled={isChangingPack || packShareCode.length < 6}
-                    class="bg-black text-white font-bold px-4 py-2 rounded hover:opacity-80 disabled:opacity-50"
-                >
-                    {isChangingPack ? "..." : "LOAD"}
-                </button>
-            </div>
-            <div class="text-[10px] text-gray-400">
-                Created a custom pack? Paste its 6-character code here.
+            <div class="flex flex-col gap-1 w-full max-w-[200px] mt-6">
+                <div class="flex gap-1 items-center">
+                    <input
+                        bind:value={packShareCode}
+                        placeholder="CODE"
+                        class="flex-1 border border-black rounded p-1 font-mono text-center text-xs uppercase focus:outline-none focus:ring-1 focus:ring-black placeholder:normal-case h-8"
+                        maxlength="6"
+                    />
+                    <button
+                        onclick={changePack}
+                        disabled={isChangingPack || packShareCode.length < 6}
+                        class="bg-black text-white font-bold px-2 text-xs rounded h-8 hover:opacity-80 disabled:opacity-50"
+                    >
+                        {isChangingPack ? ".." : "GO"}
+                    </button>
+                </div>
+                <!-- Removed explanatory text to minimize clutter as requested size reduction implies less prominence -->
             </div>
         {/if}
     </div>
@@ -119,7 +122,7 @@
         <h2
             class="text-xl font-bold text-black uppercase tracking-wider mb-6 border-b-2 border-black pb-2 inline-block"
         >
-            Players ({$gameState.players.length})
+            Players ({$gameState.players.length}/8)
         </h2>
 
         <div class="grid gap-4">
@@ -148,9 +151,21 @@
                             {/if}
                             {#if player.isHost}
                                 <span
-                                    class="text-xs px-2 py-1 rounded-full border border-black text-black font-bold"
-                                    >HOST</span
-                                >
+                                    class="text-xs px-2 py-1 rounded-full border border-black text-black font-bold flex items-center gap-1"
+                                    >HOST
+                                    {#if player.id === $gameState.playerId}
+                                        <button
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                showHostGuide = true;
+                                            }}
+                                            class="hover:bg-gray-100 rounded-full p-0.5 transition-colors"
+                                            title="Host Guide"
+                                        >
+                                            <HelpCircle size={12} />
+                                        </button>
+                                    {/if}
+                                </span>
                             {/if}
                         </div>
                     </div>
@@ -167,4 +182,8 @@
             {/if}
         </div>
     </div>
+
+    {#if showHostGuide}
+        <HostGuideModal on:close={() => (showHostGuide = false)} />
+    {/if}
 </div>

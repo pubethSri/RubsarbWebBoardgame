@@ -3,6 +3,8 @@ import { TopicManager } from './TopicManager';
 
 const topicManager = new TopicManager();
 
+const MAX_PLAYERS = 8;
+
 export class Room {
     public code: string;
     public players: Player[] = [];
@@ -22,6 +24,9 @@ export class Room {
     }
 
     addPlayer(id: string, name: string, ws: any): Player {
+        if (this.players.length >= MAX_PLAYERS) {
+            throw new Error("Room is full (Max 8 players)");
+        }
         const isHost = this.players.length === 0;
         const token = crypto.randomUUID();
         const player: Player = {

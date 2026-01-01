@@ -1,35 +1,41 @@
 <script lang="ts">
     import { ArrowLeft, Trash2, ShieldAlert } from "lucide-svelte";
     import { slide } from "svelte/transition";
+    import { authStore } from "../lib/stores/auth";
+    import { onMount } from "svelte";
 
     export let onBack: () => void;
 
-    let password = "";
-    let isAuthenticated = false;
-    let isLoading = false;
+    let isLoading = true;
     let errorMsg = "";
     let packs: any[] = [];
     let selectedPack: any = null;
     let selectedTopics: any[] = [];
     let showModal = false;
 
-    const APP_VERSION = "0.5.0"; // SQLite Update
+    const APP_VERSION = "0.6.0"; // Local Auth Update
 
-    async function login() {
-        if (!password) return;
+    onMount(async () => {
+        if (!$authStore || $authStore.role !== "ADMIN") {
+            errorMsg = "Access Denied";
+            isLoading = false;
+            return;
+        }
+        await fetchPacks();
+    });
+
+    async function fetchPacks() {
         isLoading = true;
-        errorMsg = "";
-
         try {
+            // @ts-ignore
             const res = await fetch("/api/admin/packs", {
-                headers: { "x-admin-password": password },
+                headers: { "x-auth-token": $authStore.token },
             });
 
             if (res.ok) {
                 packs = await res.json();
-                isAuthenticated = true;
             } else {
-                errorMsg = "Access Denied: Invalid Password";
+                errorMsg = "Failed to load packs";
             }
         } catch (e) {
             errorMsg = "Connection Failed";
@@ -44,7 +50,7 @@
         try {
             const res = await fetch(`/api/admin/packs/${id}`, {
                 method: "DELETE",
-                headers: { "x-admin-password": password },
+                headers: { "x-auth-token": $authStore!.token },
             });
 
             if (res.ok) {
@@ -61,7 +67,7 @@
         selectedPack = pack;
         try {
             const res = await fetch(`/api/admin/packs/${pack.id}/topics`, {
-                headers: { "x-admin-password": password },
+                headers: { "x-auth-token": $authStore!.token },
             });
             if (res.ok) {
                 selectedTopics = await res.json();
@@ -110,33 +116,14 @@
         <div class="font-mono text-xs opacity-50">v{APP_VERSION}</div>
     </div>
 
-    {#if !isAuthenticated}
+    {#if errorMsg}
         <div
-            class="flex flex-col gap-4 p-8 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-w-md mx-auto mt-12 w-full"
+            class="flex flex-col gap-4 p-8 bg-black text-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-w-md mx-auto mt-12 w-full text-center"
         >
-            <h2 class="text-xl font-bold uppercase">Restricted Access</h2>
-            <p class="text-sm text-gray-600">
-                Please enter the server admin password.
-            </p>
-            <input
-                bind:value={password}
-                type="password"
-                placeholder="Admin Password..."
-                class="border-2 border-black p-3 rounded font-mono text-lg"
-                onkeydown={(e) => e.key === "Enter" && login()}
-            />
-            {#if errorMsg}
-                <div class="text-red-600 font-bold text-center text-sm">
-                    {errorMsg}
-                </div>
-            {/if}
-            <button
-                onclick={login}
-                disabled={isLoading}
-                class="w-full py-3 bg-black text-white font-bold rounded hover:opacity-80 disabled:opacity-50"
-            >
-                {isLoading ? "Checking..." : "Unlock Dashboard"}
-            </button>
+            <h2 class="text-xl font-bold uppercase text-white">
+                Restricted Access
+            </h2>
+            <p class="text-gray-300 font-bold">{errorMsg}</p>
         </div>
     {:else}
         <div
@@ -146,10 +133,6 @@
                 class="p-4 bg-gray-50 border-b-2 border-black flex justify-between items-center"
             >
                 <span class="font-bold">Total Packs: {packs.length}</span>
-                <button
-                    onclick={() => (isAuthenticated = false)}
-                    class="text-xs underline text-red-600">Logout</button
-                >
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -172,8 +155,7 @@
                                 class="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                             >
                                 <td class="p-4 font-bold">{pack.name}</td>
-                                <td
-                                    class="p-4 font-mono font-bold text-blue-600"
+                                <td class="p-4 font-mono font-bold text-black"
                                     >{pack.share_code || "-"}</td
                                 >
                                 <td class="p-4 font-mono text-sm"
@@ -211,7 +193,7 @@
                                     {#if !pack.is_official}
                                         <button
                                             onclick={() => deletePack(pack.id)}
-                                            class="p-1 text-red-600 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
+                                            class="p-1 text-black hover:bg-gray-200 rounded border border-transparent hover:border-black transition-all"
                                             title="Delete Pack"
                                         >
                                             <Trash2 size={16} />
@@ -273,7 +255,7 @@
                             <span class="font-medium">{topic.topic}</span>
                             {#if topic.type === "SPICY"}
                                 <span
-                                    class="ml-auto text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded font-bold self-start"
+                                    class="ml-auto text-[10px] bg-black text-white px-2 py-1 rounded font-bold self-start"
                                     >SPICY</span
                                 >
                             {/if}

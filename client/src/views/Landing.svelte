@@ -1,12 +1,19 @@
 <script lang="ts">
     import { socketStore } from "../lib/stores/socket";
+    import { gameState } from "../lib/stores/gameState";
 
     import CreatePack from "./CreatePack.svelte";
     import Admin from "./Admin.svelte";
+    import LoginModal from "../components/LoginModal.svelte";
+    import HowToPlayModal from "../components/HowToPlayModal.svelte";
+    import { authStore, logout } from "../lib/stores/auth";
+    import { HelpCircle } from "lucide-svelte";
 
     let playerName = $state("");
     let roomCode = $state("");
     let viewMode = $state<"HOME" | "JOIN" | "CREATE_PACK" | "ADMIN">("HOME");
+    let showLogin = $state(false);
+    let showHowToPlay = $state(false);
 
     function createRoom() {
         if (!playerName.trim()) return;
@@ -26,9 +33,9 @@
 </script>
 
 {#if viewMode === "CREATE_PACK"}
-    <CreatePack onBack={() => viewMode = "HOME"} />
+    <CreatePack onBack={() => (viewMode = "HOME")} />
 {:else if viewMode === "ADMIN"}
-    <Admin onBack={() => viewMode = "HOME"} />
+    <Admin onBack={() => (viewMode = "HOME")} />
 {:else}
     <div
         class="flex flex-col items-center justify-center min-h-screen p-4 bg-white text-black"
@@ -56,6 +63,14 @@
                 />
             </div>
 
+            {#if $gameState.error}
+                <div
+                    class="mb-4 p-3 bg-black text-white border-2 border-dashed border-gray-500 font-bold rounded text-center text-sm"
+                >
+                    ⚠️ {$gameState.error}
+                </div>
+            {/if}
+
             {#if viewMode === "HOME"}
                 <button
                     onclick={createRoom}
@@ -71,14 +86,18 @@
                     Join Existing Room
                 </button>
 
-                <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-300">
-                    <button
-                        onclick={() => (viewMode = "CREATE_PACK")}
-                        class="w-full py-2 text-sm font-bold text-gray-500 hover:text-black hover:underline transition-all"
+                {#if $authStore && ($authStore.role === "CREATOR" || $authStore.role === "ADMIN")}
+                    <div
+                        class="mt-4 pt-4 border-t-2 border-dashed border-gray-300 animate-in fade-in"
                     >
-                        Or create your own Topics Pack?
-                    </button>
-                </div>
+                        <button
+                            onclick={() => (viewMode = "CREATE_PACK")}
+                            class="w-full py-2 text-sm font-bold text-gray-500 hover:text-black hover:underline transition-all"
+                        >
+                            Or create your own Topics Pack?
+                        </button>
+                    </div>
+                {/if}
             {:else if viewMode === "JOIN"}
                 <div class="mb-6 animate-in fade-in slide-in-from-bottom-2">
                     <label
@@ -114,12 +133,57 @@
             {/if}
         </div>
 
-        <!-- Admin Link -->
-        <button
-            onclick={() => viewMode = "ADMIN"}
-            class="fixed bottom-2 right-2 text-[10px] text-gray-300 hover:text-gray-500 transition-colors font-mono"
-        >
-            ADMIN
-        </button>
+        <!-- How To Play (Top Left) -->
+        <div class="fixed top-4 left-4">
+            <button
+                onclick={() => (showHowToPlay = true)}
+                class="flex items-center gap-2 text-xs font-bold hover:underline opacity-60 hover:opacity-100 transition-opacity"
+            >
+                <HelpCircle size={16} /> HOW TO PLAY
+            </button>
+        </div>
+
+        <!-- Auth Controls -->
+        <div class="fixed top-4 right-4 flex gap-4 items-center">
+            {#if $authStore}
+                <div class="text-xs font-mono">
+                    <span class="font-bold">{$authStore.username}</span>
+                    <span class="opacity-50">({$authStore.role})</span>
+                </div>
+                <button
+                    onclick={logout}
+                    class="text-xs underline hover:bg-black hover:text-white px-1"
+                >
+                    Logout
+                </button>
+            {:else}
+                <button
+                    onclick={() => (showLogin = true)}
+                    class="text-xs font-bold hover:underline"
+                >
+                    LOGIN
+                </button>
+            {/if}
+        </div>
+
+        <!-- Admin / Creator Links -->
+        <div class="fixed bottom-2 right-2 flex flex-col items-end gap-1">
+            {#if $authStore?.role === "ADMIN"}
+                <button
+                    onclick={() => (viewMode = "ADMIN")}
+                    class="text-[10px] text-gray-400 hover:text-black font-bold font-mono uppercase border border-transparent hover:border-black px-1"
+                >
+                    Admin Dashboard
+                </button>
+            {/if}
+        </div>
     </div>
+
+    {#if showLogin}
+        <LoginModal on:close={() => (showLogin = false)} />
+    {/if}
+
+    {#if showHowToPlay}
+        <HowToPlayModal on:close={() => (showHowToPlay = false)} />
+    {/if}
 {/if}

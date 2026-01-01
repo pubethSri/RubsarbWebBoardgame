@@ -4,11 +4,12 @@
     import { flip } from "svelte/animate";
     import { fly } from "svelte/transition";
 
+    import { authStore } from "../lib/stores/auth";
+
     export let onBack: () => void;
 
     let packName = "";
     let authorName = "";
-    let creatorPassword = "";
     let topics: { id: string; topic: string; type: "NORMAL" | "SPICY" }[] = [
         { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
         { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
@@ -44,7 +45,8 @@
         const validTopics = topics.filter((t) => t.topic.trim().length > 0);
         if (validTopics.length < 5)
             return (errorMsg = "Please fill in at least 5 topics");
-        if (!creatorPassword) return (errorMsg = "Creator password required");
+
+        if (!$authStore) return (errorMsg = "You must be logged in");
 
         isSubmitting = true;
 
@@ -53,7 +55,7 @@
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-creator-password": creatorPassword,
+                    "x-auth-token": $authStore.token,
                 },
                 body: JSON.stringify({
                     name: packName,
@@ -103,7 +105,7 @@
 
     {#if errorMsg}
         <div
-            class="bg-red-100 border-2 border-red-500 text-red-700 p-4 rounded font-bold"
+            class="bg-black text-white p-4 rounded font-bold border-2 border-dashed border-gray-500"
         >
             {errorMsg}
         </div>
@@ -111,7 +113,7 @@
 
     {#if successMsg}
         <div
-            class="bg-green-100 border-2 border-green-500 text-green-700 p-4 rounded font-bold"
+            class="bg-white border-2 border-black text-black p-4 rounded font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
         >
             {successMsg}
         </div>
@@ -143,17 +145,6 @@
                 placeholder="Your Name"
                 class="border-2 border-black p-2 rounded font-mono focus:outline-none focus:ring-2 focus:ring-black"
                 maxlength="20"
-            />
-        </div>
-        <div class="flex flex-col gap-2">
-            <label class="font-bold uppercase text-xs tracking-wider"
-                >Creator Password</label
-            >
-            <input
-                bind:value={creatorPassword}
-                type="password"
-                placeholder="Access Code"
-                class="border-2 border-black p-2 rounded font-mono focus:outline-none focus:ring-2 focus:ring-black"
             />
         </div>
     </div>
@@ -195,7 +186,7 @@
                     <button
                         onclick={() => removeTopic(topic.id)}
                         disabled={topics.length <= 5}
-                        class="p-2 text-red-500 hover:bg-red-50 rounded disabled:opacity-50"
+                        class="p-2 text-black hover:bg-gray-100 rounded disabled:opacity-50"
                     >
                         <X size={20} />
                     </button>
@@ -209,7 +200,7 @@
         <button
             onclick={submitPack}
             disabled={isSubmitting}
-            class="w-full py-4 bg-green-500 border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black text-xl hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full py-4 bg-white text-black border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black text-xl hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
             {isSubmitting ? "SAVING..." : "PUBLISH PACK"}
         </button>
