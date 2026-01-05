@@ -46,3 +46,5 @@ Thumbs.db
 .agent
 .shared
 ai_context
+
+db_data/
