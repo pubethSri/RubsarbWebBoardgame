@@ -7,17 +7,32 @@
 
     import { authStore } from "../lib/stores/auth";
 
+    // Polyfill for insecure contexts (HTTP)
+    function generateUUID() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+            /[xy]/g,
+            function (c) {
+                var r = (Math.random() * 16) | 0,
+                    v = c == "x" ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            },
+        );
+    }
+
     let { onBack } = $props<{ onBack: () => void }>();
 
     let packName = $state("");
     let authorName = $state("");
     let topics: { id: string; topic: string; type: "NORMAL" | "SPICY" }[] =
         $state([
-            { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
-            { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
-            { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
-            { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
-            { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
+            { id: generateUUID(), topic: "", type: "NORMAL" },
+            { id: generateUUID(), topic: "", type: "NORMAL" },
+            { id: generateUUID(), topic: "", type: "NORMAL" },
+            { id: generateUUID(), topic: "", type: "NORMAL" },
+            { id: generateUUID(), topic: "", type: "NORMAL" },
         ]);
 
     let isSubmitting = $state(false);
@@ -25,10 +40,7 @@
     let successMsg = $state("");
 
     function addTopic() {
-        topics = [
-            ...topics,
-            { id: crypto.randomUUID(), topic: "", type: "NORMAL" },
-        ];
+        topics = [...topics, { id: generateUUID(), topic: "", type: "NORMAL" }];
     }
 
     function removeTopic(id: string) {
