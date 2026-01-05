@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { RoomManager } from './RoomManager';
 import type { WsMessage } from './types';
-import { db } from './db';
+import { db, initDB } from './db';
 import { migrate } from './db/migrate';
 import { rateLimit } from './middleware/rateLimit';
 // import { adminAuth } from './middleware/adminAuth';
@@ -11,7 +11,7 @@ import { staticPlugin } from "@elysiajs/static";
 import { CreatePackSchema } from './schemas/topic';
 
 // Initialize Database & Run Migrations
-// The original `initDB()` call is removed as `db` is now imported directly.
+initDB();
 await migrate();
 
 const roomManager = new RoomManager();
@@ -39,6 +39,7 @@ const app = new Elysia()
         return Bun.file(filePath);
     })
     .ws('/ws', {
+        idleTimeout: 3600, // 1 Hour
         open(ws) {
             console.log('✨ Client connected:', ws.id);
         },

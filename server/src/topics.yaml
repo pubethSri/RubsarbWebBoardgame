@@ -70,3 +70,27 @@ packs:
       - text: "Useful Items for fighting dragons"
         min_label: "Useless"
         max_label: "Essential"
+      
+      - text: "Thing for a Cult to Worship"
+        min_label: "Least"
+        max_label: "Most"
+      
+      - text: "Practical things to put in a house"
+        min_label: "Least"
+        max_label: "Most"
+      
+      - text: "Excuses for being late to class"
+        min_label: "Least"
+        max_label: "Most"
+      
+      - text: "Historical Person to have dinner with"
+        min_label: "Worst"
+        max_label: "Best"
+      
+      - text: "Places to Swim"
+        min_label: "Worst"
+        max_label: "Best"
+      
+      - text: "Ways to travel in Bangkok"
+        min_label: "Worst"
+        max_label: "Best"

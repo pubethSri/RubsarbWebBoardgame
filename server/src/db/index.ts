@@ -1,7 +1,11 @@
 import { Database } from "bun:sqlite";
+import { mkdirSync } from "fs";
+
+// Ensure db directory exists
+try { mkdirSync("db"); } catch (e) { }
 
 // persistent sqlite database
-const db = new Database("rubsarb.sqlite", { create: true });
+const db = new Database("db/rubsarb.sqlite", { create: true });
 
 // Optimize for concurrency and data integrity
 db.query("PRAGMA journal_mode = WAL;").run();
@@ -14,6 +18,7 @@ export function initDB() {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             author TEXT NOT NULL,
+            share_code TEXT,
             is_official INTEGER DEFAULT 0,
             created_at INTEGER DEFAULT (unixepoch())
         );

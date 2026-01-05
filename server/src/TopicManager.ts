@@ -12,8 +12,12 @@ export class TopicManager {
     }
 
     private logStats() {
-        const count = db.query("SELECT count(*) as count FROM topics").get() as { count: number };
-        console.log(`📚 TopicManager ready. Serving ${count.count} topics from SQLite.`);
+        try {
+            const count = db.query("SELECT count(*) as count FROM topics").get() as { count: number };
+            console.log(`📚 TopicManager ready. Serving ${count.count} topics from SQLite.`);
+        } catch (e) {
+            console.warn("⚠️ TopicManager: DB not ready or empty (This is normal during first boot/migration)");
+        }
     }
 
     getRandomTopic(packId: string = "starter_pack"): TopicDef {
