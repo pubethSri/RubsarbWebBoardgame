@@ -1,9 +1,10 @@
 <script lang="ts">
     import { gameState } from "../lib/stores/gameState";
     import { socketStore } from "../lib/stores/socket";
-    import { fade, fly } from "svelte/transition";
+    import { fade, fly, slide } from "svelte/transition";
     import HostGuideModal from "../components/HostGuideModal.svelte";
-    import { HelpCircle } from "lucide-svelte";
+    import Button from "../components/UI/Button.svelte";
+    import { HelpCircle, Crown, User, Star } from "lucide-svelte";
 
     // No need for $state for store subscriptions in Svelte 5 if using auto-subscription in template
     // But we can derive values if needed.
@@ -11,6 +12,7 @@
     let packShareCode = $state("");
     let isChangingPack = $state(false);
     let showHostGuide = $state(false);
+    let isConfiguring = $state(false);
 
     async function changePack() {
         if (!packShareCode || packShareCode.length < 6) return;
@@ -40,146 +42,202 @@
     }
 </script>
 
-<div class="flex flex-col items-center min-h-screen p-6 bg-white text-black">
-    <!-- Header -->
-    <div class="w-full max-w-2xl flex justify-between items-center mb-12">
-        <h1 class="text-3xl font-bold tracking-tight text-black">Rubsarb</h1>
-        <div class="flex items-center gap-4">
-            <div
-                class="px-4 py-2 bg-white rounded-lg border-2 border-black font-mono text-xl font-bold tracking-widest text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-            >
-                Room: <span class="text-black">{$gameState.roomCode}</span>
-            </div>
-            <button
-                onclick={() => socketStore.disconnect()}
-                class="px-4 py-2 rounded-lg bg-black text-white border-2 border-black font-bold hover:bg-gray-800 transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-1"
-            >
-                Leave
-            </button>
-        </div>
-    </div>
-
-    <!-- Host Actions -->
+<div
+    class="flex flex-col items-center min-h-screen p-6 bg-gray-50 text-black relative overflow-hidden"
+>
+    <!-- Decoration Background -->
     <div
-        class="w-full max-w-2xl mb-8 flex flex-col items-center gap-4 bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-300"
-    >
-        <div class="flex flex-col items-center gap-1">
-            <span
-                class="text-xs uppercase font-bold text-gray-500 tracking-wider mb-2"
-                >Current Topic Pack</span
+        class="absolute inset-0 z-0 opacity-5 pointer-events-none"
+        style="background-image: radial-gradient(#000 2px, transparent 2px); background-size: 20px 20px;"
+    ></div>
+
+    <!-- Content Wrapper -->
+    <div class="z-10 w-full max-w-3xl flex flex-col gap-8">
+        <!-- Header Section -->
+        <div
+            class="flex flex-col md:flex-row justify-between items-center gap-4"
+        >
+            <h1
+                class="text-4xl font-black font-mono tracking-tighter uppercase border-b-4 border-black pb-2"
             >
-            <span
-                class="text-4xl font-black bg-black text-white px-6 py-4 rounded-xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]"
-            >
-                {$gameState.activePackName || "The Essentials"}
-            </span>
+                Lobby Area
+            </h1>
+
+            <div class="flex gap-4 items-center">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] font-bold uppercase text-gray-500"
+                        >Room Code</span
+                    >
+                    <span
+                        class="text-4xl font-mono font-bold bg-primary-yellow px-4 border-4 border-black shadow-[4px_4px_0px_0px_#000000]"
+                    >
+                        {$gameState.roomCode}
+                    </span>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onclick={() => socketStore.disconnect()}
+                    class="h-full"
+                >
+                    LEAVE
+                </Button>
+            </div>
         </div>
 
-        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
-            <div class="flex flex-col gap-1 w-full max-w-[200px] mt-6">
-                <div class="flex gap-1 items-center">
-                    <input
-                        bind:value={packShareCode}
-                        placeholder="CODE"
-                        class="flex-1 border border-black rounded p-1 font-mono text-center text-xs uppercase focus:outline-none focus:ring-1 focus:ring-black placeholder:normal-case h-8"
-                        maxlength="6"
-                    />
-                    <button
-                        onclick={changePack}
-                        disabled={isChangingPack || packShareCode.length < 6}
-                        class="bg-black text-white font-bold px-2 text-xs rounded h-8 hover:opacity-80 disabled:opacity-50"
+        <!-- Host Controls (Pack Selection) -->
+        <div
+            class="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_#000000] relative"
+        >
+            <!-- Badge -->
+            <div
+                class="absolute -top-4 -left-4 bg-primary-blue text-white p-2 border-4 border-black rotate-[-6deg] shadow-sm"
+            >
+                <Star class="fill-current w-6 h-6" />
+            </div>
+
+            <div class="flex flex-col items-center gap-4 text-center">
+                <div class="space-y-1">
+                    <span class="brutal-text text-sm text-gray-500"
+                        >Current Topic Pack</span
                     >
-                        {isChangingPack ? ".." : "GO"}
-                    </button>
+                    <div
+                        class="text-2xl md:text-4xl font-black font-mono uppercase leading-tight max-w-lg"
+                    >
+                        {$gameState.activePackName || "The Essentials"}
+                    </div>
                 </div>
-                <!-- Removed explanatory text to minimize clutter as requested size reduction implies less prominence -->
+
+                {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
+                    <!-- Toggle Button -->
+                    <button
+                        class="text-xs font-bold font-mono underline hover:text-primary-blue"
+                        onclick={() => (isConfiguring = !isConfiguring)}
+                    >
+                        {isConfiguring ? "CANCEL" : "CHANGE PACK"}
+                    </button>
+
+                    {#if isConfiguring}
+                        <div
+                            transition:slide
+                            class="w-full max-w-xs flex gap-2 pt-4 border-t-2 border-dashed border-gray-300"
+                        >
+                            <input
+                                bind:value={packShareCode}
+                                placeholder="PACK CODE..."
+                                class="flex-1 h-12 border-4 border-black px-3 font-mono text-center uppercase focus:bg-yellow-50 placeholder:text-gray-400"
+                                maxlength="6"
+                            />
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onclick={changePack}
+                                disabled={isChangingPack ||
+                                    packShareCode.length < 6}
+                            >
+                                {isChangingPack ? "..." : "LOAD"}
+                            </Button>
+                        </div>
+                    {/if}
+                {/if}
+            </div>
+        </div>
+
+        <!-- Start Game Action -->
+        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
+            <div class="flex justify-center">
+                <Button
+                    variant="primary"
+                    size="lg"
+                    class="text-3xl w-full md:w-auto py-6"
+                    onclick={() =>
+                        socketStore.sendMessage({
+                            type: "START_GAME",
+                            payload: null,
+                        })}
+                    disabled={$gameState.players.length < 2}
+                >
+                    START GAME
+                </Button>
+            </div>
+        {:else}
+            <div
+                class="text-center font-mono font-bold text-gray-500 animate-pulse"
+            >
+                WAITING FOR HOST TO START...
             </div>
         {/if}
-    </div>
 
-    <!-- Start Game Button -->
-    {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
-        <div class="mb-8 w-full max-w-2xl flex justify-center">
-            <button
-                onclick={() =>
-                    socketStore.sendMessage({
-                        type: "START_GAME",
-                        payload: null,
-                    })}
-                class="px-8 py-4 rounded-xl bg-black text-white border-2 border-black font-bold text-2xl hover:scale-105 transition-transform cursor-pointer shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={$gameState.players.length < 2}
-                title={$gameState.players.length < 2
-                    ? "Need at least 2 players"
-                    : "Start Game"}
+        <!-- Player Grid -->
+        <div>
+            <div
+                class="flex justify-between items-end mb-4 border-b-4 border-black"
             >
-                START GAME
-            </button>
-        </div>
-    {/if}
+                <h2 class="brutal-text text-xl">
+                    Players ({$gameState.players.length}/8)
+                </h2>
+            </div>
 
-    <!-- Content -->
-    <div class="w-full max-w-2xl">
-        <h2
-            class="text-xl font-bold text-black uppercase tracking-wider mb-6 border-b-2 border-black pb-2 inline-block"
-        >
-            Players ({$gameState.players.length}/8)
-        </h2>
-
-        <div class="grid gap-4">
-            {#each $gameState.players as player (player.id)}
-                <div
-                    in:fly={{ y: 20, duration: 300 }}
-                    out:fade
-                    class="flex items-center p-4 bg-white rounded-xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
-                    class:bg-gray-50={player.id === $gameState.playerId}
-                >
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {#each $gameState.players as player (player.id)}
                     <div
-                        class="w-12 h-12 rounded-full bg-white flex items-center justify-center text-xl mr-4 border-2 border-black font-bold"
+                        in:fly={{ y: 20, duration: 300 }}
+                        out:fade
+                        class="relative bg-white border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000000] flex items-center gap-4 transition-all"
+                        class:bg-yellow-50={player.id === $gameState.playerId}
                     >
-                        {player.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div class="flex-1">
+                        <!-- Avatar -->
                         <div
-                            class="font-bold text-lg text-black flex items-center gap-2"
+                            class="w-12 h-12 bg-black text-white border-2 border-black flex items-center justify-center font-mono font-bold text-xl"
                         >
-                            {player.name}
-                            {#if player.id === $gameState.playerId}
-                                <span
-                                    class="text-xs px-2 py-1 rounded-full bg-black text-white font-bold"
-                                    >YOU</span
-                                >
-                            {/if}
+                            {player.name.charAt(0).toUpperCase()}
+                        </div>
+
+                        <!-- Info -->
+                        <div class="flex-1 min-w-0">
+                            <div
+                                class="font-bold truncate text-lg uppercase flex items-center gap-2"
+                            >
+                                {player.name}
+                                {#if player.id === $gameState.playerId}
+                                    <span
+                                        class="text-[10px] bg-black text-white px-1.5 py-0.5 rounded-none"
+                                        >YOU</span
+                                    >
+                                {/if}
+                            </div>
+
                             {#if player.isHost}
-                                <span
-                                    class="text-xs px-2 py-1 rounded-full border border-black text-black font-bold flex items-center gap-1"
-                                    >HOST
+                                <div
+                                    class="text-xs font-mono font-bold text-primary-blue flex items-center gap-1 mt-1"
+                                >
+                                    <Crown size={14} class="fill-current" /> HOST
                                     {#if player.id === $gameState.playerId}
                                         <button
                                             onclick={(e) => {
                                                 e.stopPropagation();
                                                 showHostGuide = true;
                                             }}
-                                            class="hover:bg-gray-100 rounded-full p-0.5 transition-colors"
-                                            title="Host Guide"
+                                            class="text-black hover:bg-black hover:text-white rounded-full p-0.5 transition-colors border border-black ml-2"
                                         >
                                             <HelpCircle size={12} />
                                         </button>
                                     {/if}
-                                </span>
+                                </div>
                             {/if}
                         </div>
                     </div>
-                </div>
-            {/each}
+                {/each}
 
-            <!-- Empty Slots placeholders (visual only) -->
-            {#if $gameState.players.length < 3}
-                <div
-                    class="p-4 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 italic font-medium"
-                >
-                    Waiting for players...
-                </div>
-            {/if}
+                <!-- Empty Slots -->
+                {#if $gameState.players.length < 3}
+                    <div
+                        class="border-4 border-dashed border-gray-300 p-4 flex items-center justify-center font-mono text-gray-400 h-[88px]"
+                    >
+                        Waiting...
+                    </div>
+                {/if}
+            </div>
         </div>
     </div>
 

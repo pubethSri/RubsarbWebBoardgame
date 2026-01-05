@@ -2,6 +2,7 @@
     import { X, Crown, Play, Eye } from "lucide-svelte";
     import { slide, fade } from "svelte/transition";
     import { createEventDispatcher } from "svelte";
+    import Button from "./UI/Button.svelte";
 
     const dispatch = createEventDispatcher();
 </script>
@@ -15,21 +16,21 @@
     <div class="absolute inset-0" onclick={() => dispatch("close")}></div>
 
     <div
-        class="relative bg-white border-4 border-black rounded-2xl w-full max-w-md shadow-[8px_8px_0px_0px_rgba(255,255,255,0.2)] flex flex-col"
+        class="relative bg-white border-4 border-black w-full max-w-md shadow-[8px_8px_0px_0px_#000000] flex flex-col"
         transition:slide={{ duration: 300, axis: "y" }}
     >
         <!-- Header -->
         <div
-            class="flex items-center justify-between p-6 border-b-2 border-dashed border-gray-300"
+            class="flex items-center justify-between p-6 border-b-4 border-black bg-primary-yellow"
         >
             <h2
-                class="text-xl font-black uppercase tracking-wider flex items-center gap-2"
+                class="text-xl font-black font-mono uppercase tracking-wider flex items-center gap-2"
             >
                 <Crown size={24} /> Host Guide
             </h2>
             <button
                 onclick={() => dispatch("close")}
-                class="p-2 hover:bg-gray-100 rounded-full transition-colors border-2 border-transparent hover:border-black"
+                class="p-1 hover:bg-black hover:text-white transition-colors border-2 border-transparent hover:border-white"
             >
                 <X size={24} />
             </button>
@@ -45,20 +46,18 @@
             <div class="space-y-4">
                 <div class="flex gap-4">
                     <div
-                        class="bg-black text-white p-3 rounded-lg h-12 w-12 flex items-center justify-center shrink-0"
+                        class="bg-black text-white border-2 border-black p-3 h-12 w-12 flex items-center justify-center shrink-0 shadow-[4px_4px_0px_0px_rgba(255,0,0,1)]"
                     >
                         <Eye size={24} />
                     </div>
                     <div>
-                        <h3 class="font-bold text-lg uppercase">Reveal Next</h3>
-                        <p class="text-sm text-gray-300 leading-relaxed">
-                            <span class="text-gray-600"
-                                >During the game, use the <strong
-                                    class="text-black">REVEAL NEXT</strong
-                                >
-                                button to reveal the <strong>Left-Most</strong> face-down
-                                card on the board. You control the dramatic tension!</span
-                            >
+                        <h3 class="font-bold font-mono text-lg uppercase mb-1">
+                            Reveal Next
+                        </h3>
+                        <p class="text-sm border-l-4 border-black pl-2">
+                            Use <strong class="bg-black text-white px-1"
+                                >REVEAL NEXT</strong
+                            > to show the Left-Most hidden card.
                         </p>
                     </div>
                 </div>
@@ -66,15 +65,14 @@
         </div>
 
         <!-- Footer -->
-        <div
-            class="p-6 border-t-2 border-dashed border-gray-300 bg-gray-50 rounded-b-xl"
-        >
-            <button
+        <div class="p-6 border-t-4 border-black bg-gray-50">
+            <Button
+                variant="primary"
+                fullWidth
                 onclick={() => dispatch("close")}
-                class="w-full py-3 bg-black text-white font-bold rounded-xl text-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
                 I'M READY
-            </button>
+            </Button>
         </div>
     </div>
 </div>

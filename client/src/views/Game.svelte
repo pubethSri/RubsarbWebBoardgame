@@ -7,7 +7,12 @@
     import { socketStore } from "../lib/stores/socket";
 </script>
 
-<div class="min-h-screen bg-white text-black relative overflow-hidden">
+<div class="min-h-screen bg-primary-yellow text-black relative overflow-hidden">
+    <!-- Decoration Background -->
+    <div
+        class="absolute inset-0 z-0 opacity-10 pointer-events-none"
+        style="background-image: radial-gradient(#000 2px, transparent 2px); background-size: 20px 20px;"
+    ></div>
     {#if $gameState.gameState === "ROUND_END"}
         <Result
             result={$gameState.roundResult || "WIN"}
@@ -36,7 +41,7 @@
                                 payload: null,
                             })}
                         disabled={!allCardsPlaced}
-                        class="px-4 py-1 rounded-lg bg-black text-white font-bold border-2 border-black hover:scale-105 transition-transform shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-0.5 cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+                        class="px-6 py-2 bg-black text-white font-mono font-bold uppercase border-4 border-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#fff] transition-all shadow-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none"
                         title={!allCardsPlaced
                             ? "Wait for all players to place cards"
                             : "Reveal next card"}
@@ -46,7 +51,7 @@
                 {/if}
 
                 <div
-                    class="px-4 py-1 border-2 border-black rounded-lg font-mono text-sm font-bold bg-white"
+                    class="px-4 py-2 border-4 border-black font-mono font-bold bg-white text-black uppercase shadow-[4px_4px_0px_0px_#000000]"
                 >
                     Level {$gameState.level}
                 </div>
@@ -60,18 +65,22 @@
             <!-- Topic Display -->
             {#if $gameState.topic}
                 <div
-                    class="flex flex-col items-center justify-center p-4 pointer-events-none mb-4"
+                    class="flex flex-col items-center justify-center p-6 pointer-events-none mb-8 relative z-10"
                 >
-                    <h1
-                        class="text-3xl font-black text-center uppercase tracking-widest leading-tight max-w-4xl"
-                    >
-                        {$gameState.topic.text}
-                    </h1>
                     <div
-                        class="flex gap-16 mt-2 text-xs font-bold font-mono text-gray-400 uppercase tracking-widest"
+                        class="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_#000000] rotate-1"
                     >
-                        <span>1 = {$gameState.topic.minRange}</span>
-                        <span>100 = {$gameState.topic.maxRange}</span>
+                        <h1
+                            class="text-2xl md:text-4xl font-black text-center font-mono uppercase leading-tight max-w-4xl"
+                        >
+                            {$gameState.topic.text}
+                        </h1>
+                        <div
+                            class="flex justify-between mt-4 text-xs font-bold font-mono text-black uppercase border-t-4 border-black pt-2"
+                        >
+                            <span>1 = {$gameState.topic.minRange}</span>
+                            <span>100 = {$gameState.topic.maxRange}</span>
+                        </div>
                     </div>
                 </div>
             {/if}

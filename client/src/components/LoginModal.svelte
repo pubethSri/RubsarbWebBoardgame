@@ -2,6 +2,7 @@
     import { createEventDispatcher } from "svelte";
     import { slide } from "svelte/transition";
     import { authStore } from "../lib/stores/auth";
+    import Button from "./UI/Button.svelte";
 
     const dispatch = createEventDispatcher();
 
@@ -47,13 +48,21 @@
     transition:slide
 >
     <div
-        class="bg-white border-4 border-black rounded-xl p-6 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+        class="bg-white border-4 border-black p-8 w-full max-w-sm shadow-[8px_8px_0px_0px_#000000] relative"
     >
-        <h2 class="text-2xl font-black uppercase mb-4 text-center">Login</h2>
+        <div
+            class="absolute -top-3 -left-3 bg-primary-blue w-full h-full -z-10 border-4 border-black transition-transform group-hover:translate-x-2 group-hover:translate-y-2"
+        ></div>
+
+        <h2
+            class="text-3xl font-black font-mono uppercase mb-6 text-center border-b-4 border-black pb-4"
+        >
+            Login
+        </h2>
 
         {#if errorMsg}
             <div
-                class="bg-black text-white p-2 rounded mb-4 text-sm font-bold text-center border-2 border-dashed border-gray-500"
+                class="bg-primary-red text-white p-2 mb-4 text-sm font-bold font-mono text-center border-4 border-black shadow-[4px_4px_0px_0px_#000000]"
             >
                 {errorMsg}
             </div>
@@ -63,31 +72,35 @@
             <input
                 bind:value={username}
                 type="text"
-                placeholder="Username"
-                class="border-2 border-black p-3 rounded font-mono"
+                placeholder="USERNAME"
+                class="h-12 border-4 border-black px-3 font-mono text-lg uppercase focus:bg-yellow-50 placeholder:text-gray-400"
             />
             <input
                 bind:value={password}
                 type="password"
-                placeholder="Password"
-                class="border-2 border-black p-3 rounded font-mono"
+                placeholder="PASSWORD"
+                class="h-12 border-4 border-black px-3 font-mono text-lg placeholder:text-gray-400"
                 on:keydown={(e) => e.key === "Enter" && handleLogin()}
             />
 
-            <button
-                on:click={handleLogin}
+            <Button
+                variant="primary"
+                fullWidth
                 disabled={isLoading}
-                class="w-full py-3 bg-black text-white font-bold rounded hover:opacity-80 disabled:opacity-50"
+                onclick={handleLogin}
+                class="mt-2"
             >
-                {isLoading ? "Logging in..." : "ENTER"}
-            </button>
+                {isLoading ? "..." : "ENTER"}
+            </Button>
 
-            <button
-                on:click={() => dispatch("close")}
-                class="text-sm text-gray-500 underline hover:text-black"
+            <Button
+                variant="ghost"
+                fullWidth
+                size="sm"
+                onclick={() => dispatch("close")}
             >
-                Cancel
-            </button>
+                CANCEL
+            </Button>
         </div>
     </div>
 </div>

@@ -36,69 +36,105 @@
     function leaveRoom() {
         socketStore.disconnect();
     }
+
+    import Button from "../components/UI/Button.svelte";
 </script>
 
 <div
-    class="h-full w-full flex flex-col items-center justify-center p-8 gap-8 bg-white text-black font-sans"
+    class="min-h-screen w-full flex flex-col items-center justify-center p-8 gap-8 font-sans relative overflow-hidden"
+    class:bg-white={result === "WIN"}
+    class:bg-black={result === "LOSS"}
+    class:text-white={result === "LOSS"}
+    class:text-black={result === "WIN"}
 >
+    <!-- Background Pattern -->
+    <div
+        class="absolute inset-0 z-0 opacity-10 pointer-events-none"
+        style="background-image: radial-gradient(currentColor 2px, transparent 2px); background-size: 20px 20px;"
+    ></div>
+
     <!-- Header -->
-    <div class="text-center">
+    <div class="text-center z-10 relative">
         {#if playerCount < 2}
-            <h1 class="text-6xl font-bold mb-2">SESSION ENDED</h1>
-            <p class="text-xl text-gray-600">
-                Everyone left... You are the only one remaining.
+            <h1
+                class="text-4xl md:text-6xl font-black font-mono uppercase mb-4 bg-white text-black border-4 border-black p-4 shadow-[8px_8px_0px_0px_#000000] rotate-2"
+            >
+                SESSION ENDED
+            </h1>
+            <p
+                class="text-xl font-bold font-mono bg-black text-white inline-block px-2"
+            >
+                Everyone left...
             </p>
         {:else if result === "WIN"}
-            <h1 class="text-6xl font-bold mb-2">ROUND CLEARED!</h1>
-            <p class="text-xl text-gray-600">Level {level} Complete</p>
+            <div class="relative">
+                <h1
+                    class="text-6xl md:text-8xl font-black font-mono uppercase mb-2 text-primary-blue drop-shadow-[4px_4px_0px_#000000]"
+                >
+                    VICTORY!
+                </h1>
+                <p
+                    class="text-3xl font-black uppercase tracking-widest bg-black text-white inline-block px-4 py-1 border-4 border-white rotate-[-2deg]"
+                >
+                    Level {level} Complete
+                </p>
+            </div>
         {:else}
-            <h1 class="text-6xl font-bold mb-2">FAILED</h1>
-            <p class="text-xl text-gray-600">
-                Would you like to try Level {level} again?
-            </p>
+            <div class="relative">
+                <h1
+                    class="text-6xl md:text-8xl font-black font-mono uppercase mb-2 text-primary-red drop-shadow-[4px_4px_0px_#ffffff]"
+                >
+                    FAILED
+                </h1>
+                <p
+                    class="text-2xl font-bold font-mono uppercase bg-white text-black inline-block px-4 py-1 border-4 border-white"
+                >
+                    Try Level {level} Again?
+                </p>
+            </div>
         {/if}
     </div>
 
     <!-- Topic Display -->
     {#if topic}
-        <div class="flex flex-col items-center gap-2">
+        <div class="flex flex-col items-center gap-2 z-10">
             <div
-                class="bg-gray-100 px-6 py-3 rounded-full text-lg border border-gray-300"
+                class="bg-white px-6 py-3 border-4 border-black shadow-[4px_4px_0px_0px_#000000]"
+                class:shadow-[4px_4px_0px_0px_#ffffff]={result === "LOSS"}
+                class:border-white={result === "LOSS"}
+                class:text-black={result === "LOSS"}
             >
-                Topic: <span class="font-bold">{topic.text}</span>
-            </div>
-            <div
-                class="text-xs font-bold font-mono text-gray-500 uppercase tracking-widest flex gap-8"
-            >
-                <span>1 = {topic.minRange}</span>
-                <span>100 = {topic.maxRange}</span>
+                Topic: <span class="font-bold font-mono uppercase"
+                    >{topic.text}</span
+                >
             </div>
         </div>
     {/if}
 
     <!-- Cards Display (All Revealed) -->
     <div
-        class="flex flex-wrap gap-4 justify-center items-center max-w-4xl"
+        class="flex flex-wrap gap-4 justify-center items-center max-w-4xl z-10"
         in:fly={{ y: 50, duration: 800, delay: 300 }}
     >
         {#each finalBoard as card}
             <!-- Mini Card Display -->
-            <div class="flex flex-col items-center">
+            <div class="flex flex-col items-center group">
                 <div
-                    class="w-16 h-24 border-2 border-black rounded-lg flex items-center justify-center bg-white shadow-md"
+                    class="w-16 h-24 border-2 border-black flex items-center justify-center bg-white shadow-[2px_2px_0px_0px_#000000] transition-transform group-hover:-translate-y-1"
                 >
-                    <span class="text-xl font-bold text-black"
+                    <span class="text-xl font-mono font-bold text-black"
                         >{card.value}</span
                     >
                 </div>
                 {#if card.note}
                     <span
-                        class="text-[10px] text-gray-500 mt-1 max-w-[4rem] truncate"
+                        class="text-[10px] font-bold mt-1 max-w-[4rem] truncate bg-primary-yellow text-black px-1 border border-black"
                         >{card.note}</span
                     >
                 {/if}
                 <span
-                    class="text-[10px] font-bold mt-1 bg-gray-200 px-2 rounded-full"
+                    class="text-[10px] font-bold mt-1 bg-black text-white px-2 border border-black"
+                    class:border-white={result === "LOSS"}
                 >
                     {getPlayerName(card.playerId)}
                 </span>
@@ -107,33 +143,36 @@
     </div>
 
     <!-- Actions -->
-    <div class="flex flex-col gap-4 mt-8 w-64">
-        <button
-            class="w-full py-3 text-lg font-bold border-2 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            class:bg-black={playerCount < 2 || !isReady}
-            class:text-white={playerCount < 2 || !isReady}
-            class:bg-gray-200={playerCount >= 2 && isReady}
-            class:text-gray-500={playerCount >= 2 && isReady}
+    <div class="flex flex-col gap-4 mt-8 w-72 z-10">
+        <Button
+            size="lg"
+            fullWidth
+            variant={result === "WIN" ? "primary" : "secondary"}
             onclick={playerCount < 2 ? leaveRoom : sendReady}
             disabled={isReady && playerCount >= 2}
+            class={result === "LOSS" ? "shadow-[4px_4px_0px_0px_#fff]" : ""}
         >
             {#if playerCount < 2}
-                RETURN TO MAIN MENU
+                EXIT
             {:else if isReady}
                 WAITING... ({readyCount}/{playerCount})
             {:else if result === "WIN"}
-                READY FOR LEVEL {level + 1}
+                NEXT LEVEL →
             {:else}
-                RETRY LEVEL {level}
+                RETRY
             {/if}
-        </button>
+        </Button>
 
-        <button
-            class="w-full py-2 text-sm font-bold text-gray-500 hover:text-black underline"
+        <Button
+            variant="ghost"
+            fullWidth
+            class={result === "LOSS"
+                ? "text-white hover:bg-white/10 hover:border-white border-white"
+                : ""}
             onclick={leaveRoom}
         >
             LEAVE ROOM
-        </button>
+        </Button>
     </div>
 </div>
 

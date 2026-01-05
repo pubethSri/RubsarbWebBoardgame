@@ -36,6 +36,7 @@ export interface RoomState {
     readyCount: number;
     activePackName?: string;
     activePackId?: string;
+    roundResult?: 'WIN' | 'LOSS';
 }
 
 export type WsMessage =

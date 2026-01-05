@@ -18,6 +18,7 @@ export class Room {
     private readyPlayers: Set<string> = new Set();
     public activePackId: string = "starter_pack";
     public activePackName: string = "The Essentials";
+    public roundResult: 'WIN' | 'LOSS' | null = null;
 
     constructor(code: string) {
         this.code = code;
@@ -110,6 +111,7 @@ export class Room {
         this.version = 0; // Reset version on game start
         this.board = []; // Reset board
         this.readyPlayers.clear();
+        this.roundResult = null; // Reset result
 
         // Shuffle
         for (let i = this.deck.length - 1; i > 0; i--) {
@@ -321,7 +323,9 @@ export class Room {
                 // @ts-ignore
                 if (card.value < prevCard.value) {
                     console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
+                    console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
                     this.gameState = 'ROUND_END';
+                    this.roundResult = 'LOSS';
                     // Reveal ALL remaining cards
                     this.board.forEach(c => c.isFaceUp = true);
 
@@ -343,6 +347,7 @@ export class Room {
                 if (isSorted) {
                     console.log("✅ SUCCESS: All cards revealed in ascending order!");
                     this.gameState = 'ROUND_END';
+                    this.roundResult = 'WIN';
                     this.level++; // Increment Level
 
                     this.broadcast({
@@ -371,7 +376,8 @@ export class Room {
             level: this.level,
             readyCount: this.readyPlayers.size,
             activePackName: this.activePackName,
-            activePackId: this.activePackId
+            activePackId: this.activePackId,
+            roundResult: this.roundResult || undefined
         };
     }
 }

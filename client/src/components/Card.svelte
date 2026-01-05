@@ -36,10 +36,17 @@
 
 <div class="flex flex-col items-center gap-2">
     <div
-        class="w-32 h-48 border-2 border-black rounded-xl flex flex-col items-center justify-between bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-transform hover:-translate-y-1 cursor-grab active:cursor-grabbing font-mono select-none overflow-hidden"
+        class="w-32 h-48 border-4 border-black flex flex-col items-center justify-between bg-white shadow-[4px_4px_0px_0px_#000000] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] cursor-grab active:cursor-grabbing font-mono select-none overflow-hidden relative"
         class:bg-black={hidden}
         class:text-white={hidden}
     >
+        <!-- Pattern for Hidden Card (Back) -->
+        {#if hidden}
+            <div
+                class="absolute inset-0 opacity-20"
+                style="background-image: repeating-linear-gradient(45deg, #333 0, #333 2px, transparent 2px, transparent 8px);"
+            ></div>
+        {/if}
         <!-- Top: Value -->
         <div class="flex-1 flex items-center justify-center w-full">
             {#if hidden}
@@ -51,12 +58,12 @@
 
         <!-- Bottom: Note (1 Line) -->
         <div
-            class="w-full h-8 border-t-2 border-black bg-yellow-50 text-black flex items-center justify-center p-0.5"
+            class="w-full h-8 border-t-4 border-black bg-primary-yellow text-black flex items-center justify-center p-0.5 z-10"
         >
             {#if canEdit}
                 <input
                     type="text"
-                    class="w-full h-full bg-transparent text-xs text-center border-none focus:ring-0 p-0 placeholder-gray-400 font-sans"
+                    class="w-full h-full bg-transparent text-xs text-center border-none focus:ring-0 p-0 placeholder-black/30 font-bold font-mono uppercase"
                     placeholder="Note..."
                     bind:value={noteValue}
                     onblur={handleBlur}
@@ -74,7 +81,7 @@
 
     {#if ownerName}
         <span
-            class="text-xs font-bold text-black bg-white border border-black px-2 py-0.5 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)]"
+            class="text-[10px] font-bold text-white bg-black border-2 border-black px-2 py-0.5 shadow-[2px_2px_0px_0px_#000000]"
         >
             {ownerName}
         </span>

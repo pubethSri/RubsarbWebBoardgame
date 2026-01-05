@@ -17,72 +17,54 @@
 <div class="absolute top-4 left-4 z-50">
     <button
         onclick={() => (isOpen = !isOpen)}
-        class="flex items-center gap-2 px-4 py-2 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all font-bold text-sm hover:bg-gray-50"
+        class="flex items-center gap-2 px-2 py-2 bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000000] active:translate-y-1 active:shadow-none transition-all font-mono font-bold text-sm hover:bg-yellow-50"
     >
-        <span class="flex items-center gap-2">
+        <span class="flex items-center gap-2 uppercase">
             Players ({$gameState.players.length})
         </span>
         {#if isOpen}
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"><path d="m18 15-6-6-6 6" /></svg
-            >
+            <ChevronUp size={16} />
         {:else}
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg
-            >
+            <ChevronDown size={16} />
         {/if}
     </button>
 
     {#if isOpen}
         <div
             transition:slide
-            class="mt-2 w-64 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden"
+            class="mt-2 w-64 bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000000]"
         >
             <div class="flex flex-col">
                 {#each $gameState.players as player}
                     <div
-                        class="flex items-center justify-between p-3 border-b-2 border-black last:border-b-0"
+                        class="flex items-center justify-between p-3 border-b-4 border-black last:border-b-0"
                         class:bg-gray-100={!player.isConnected}
                     >
-                        <div class="flex items-center gap-3">
+                        <div
+                            class="flex items-center gap-3 flex-1 min-w-0 mr-2"
+                        >
                             <div
-                                class="w-8 h-8 rounded-full border-2 border-black flex items-center justify-center font-bold text-xs bg-white"
+                                class="w-8 h-8 border-2 border-black flex items-center justify-center font-bold text-xs bg-white font-mono shrink-0"
                                 class:text-gray-400={!player.isConnected}
                                 class:border-gray-400={!player.isConnected}
                             >
                                 {player.name.charAt(0).toUpperCase()}
                             </div>
-                            <div class="flex flex-col">
+                            <div class="flex flex-col min-w-0 flex-1">
                                 <span
                                     class="font-bold text-sm flex items-center gap-2"
                                     class:text-gray-500={!player.isConnected}
                                 >
-                                    {player.name}
+                                    <span class="truncate">{player.name}</span>
                                     {#if player.isHost}
                                         <span
-                                            class="text-[10px] bg-black text-white px-1.5 rounded"
+                                            class="text-[10px] bg-black text-white px-1.5 rounded border border-black shrink-0"
                                             >HOST</span
                                         >
                                     {/if}
                                     {#if player.id === $gameState.playerId}
                                         <span
-                                            class="text-[10px] border border-black px-1.5 rounded"
+                                            class="text-[10px] border border-black px-1.5 rounded shrink-0"
                                             >YOU</span
                                         >
                                     {/if}
@@ -92,23 +74,23 @@
 
                         {#if player.isConnected}
                             <div
-                                class="w-2 h-2 rounded-full bg-green-500 animate-pulse"
+                                class="w-2 h-2 bg-green-500 animate-pulse border border-black"
                                 title="Online"
                             ></div>
                         {:else}
                             <div
-                                class="w-2 h-2 rounded-full bg-red-500"
+                                class="w-2 h-2 bg-red-500 border border-black"
                                 title="Disconnected"
                             ></div>
                         {/if}
                     </div>
                 {/each}
             </div>
-            
+
             <div class="p-2 border-t-2 border-black bg-gray-50">
                 <button
                     onclick={() => socketStore.disconnect()}
-                    class="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 border border-red-200 rounded hover:bg-red-50 hover:border-red-400 transition-colors"
+                    class="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold font-mono uppercase bg-black text-white border-2 border-black hover:bg-primary-red transition-colors"
                 >
                     <LogOut size={14} />
                     Leave Room

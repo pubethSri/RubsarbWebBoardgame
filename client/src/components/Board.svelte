@@ -90,14 +90,14 @@
 <div class="w-full max-w-5xl mx-auto mt-4 relative flex justify-center px-4">
     <!-- Active Drop Zone (The Board) -->
     <div
-        class="w-full min-h-[400px] border-4 border-dashed border-gray-300 rounded-3xl flex flex-wrap justify-center content-start gap-4 p-8 transition-colors bg-gray-50/50"
+        class="w-full min-h-[400px] border-4 border-black border-dashed bg-white flex flex-wrap justify-center content-start gap-4 p-8 transition-colors shadow-[8px_8px_0px_0px_#000000]"
         use:dndzone={{ items: localBoard, flipDurationMs }}
         on:consider={handleDndConsider}
         on:finalize={handleDndFinalize}
     >
         {#if localBoard.length === 0}
             <div
-                class="w-full h-full flex items-center justify-center text-gray-400 font-medium italic pointer-events-none absolute inset-0"
+                class="w-full h-full flex items-center justify-center text-gray-400 font-black uppercase text-xl tracking-widest pointer-events-none absolute inset-0 opacity-30"
             >
                 Place cards here in ascending order...
             </div>

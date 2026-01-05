@@ -21,15 +21,17 @@
     <div class="absolute inset-0" onclick={() => dispatch("close")}></div>
 
     <div
-        class="relative bg-white border-4 border-black rounded-2xl w-full max-w-lg shadow-[8px_8px_0px_0px_rgba(255,255,255,0.2)] flex flex-col max-h-[90vh]"
+        class="relative bg-white border-4 border-black w-full max-w-lg shadow-[8px_8px_0px_0px_#000000] flex flex-col max-h-[90vh]"
         transition:slide={{ duration: 300, axis: "y" }}
     >
         <!-- Header -->
         <div
-            class="flex items-center justify-between p-6 border-b-2 border-dashed border-gray-300"
+            class="flex items-center justify-between p-6 border-b-4 border-black bg-primary-yellow"
         >
-            <h2 class="text-2xl font-black uppercase tracking-wider">
-                How to Play
+            <h2
+                class="text-2xl font-black font-mono uppercase tracking-tighter"
+            >
+                How to Play??
             </h2>
             <button
                 onclick={() => dispatch("close")}
@@ -214,22 +216,24 @@
 
             <!-- Topic Mechanic -->
             <div
-                class="bg-black p-4 rounded-xl text-white space-y-2 relative overflow-hidden"
+                class="bg-black p-4 text-white space-y-2 relative overflow-hidden border-4 border-black shadow-[4px_4px_0px_0px_#000000]"
             >
-                <div class="absolute top-0 right-0 p-4 opacity-10">
+                <div class="absolute top-0 right-0 p-4 opacity-20">
                     <MessageSquareOff size={100} />
                 </div>
-                <h3 class="font-bold uppercase text-lg relative z-10">
+                <h3
+                    class="font-bold font-mono uppercase text-lg relative z-10 text-primary-yellow"
+                >
                     Use The Topic!
                 </h3>
-                <p class="text-sm text-gray-300 relative z-10">
+                <p class="text-sm text-gray-300 relative z-10 font-mono">
                     Between levels, you can discuss the <span
-                        class="text-white font-bold underline"
+                        class="text-primary-yellow font-bold underline decoration-2"
                         >Current Topic</span
                     > to get a sense of each other’s scale.
                 </p>
                 <div
-                    class="mt-3 p-3 bg-white/10 rounded border border-white/20 text-xs font-mono relative z-10"
+                    class="mt-3 p-3 bg-white text-black border-2 border-white text-xs font-mono font-bold relative z-10 italic"
                 >
                     "If the topic is 'Animals (Size)' and I have a Mouse, that's
                     small (low number). An Elephant is big (high number)!"
@@ -238,12 +242,10 @@
         </div>
 
         <!-- Footer -->
-        <div
-            class="p-6 border-t-2 border-dashed border-gray-300 bg-gray-50 rounded-b-xl"
-        >
+        <div class="p-6 border-t-4 border-black bg-gray-50">
             <button
                 onclick={() => dispatch("close")}
-                class="w-full py-3 bg-black text-white font-bold rounded-xl text-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                class="w-full py-3 bg-primary-blue text-white font-mono font-bold text-xl border-4 border-black shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-1 hover:translate-x-1 hover:shadow-[6px_6px_0px_0px_#000000] active:translate-x-0 active:translate-y-0 active:shadow-[2px_2px_0px_0px_#000000] transition-all"
             >
                 GOT IT
             </button>

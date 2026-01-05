@@ -38,7 +38,8 @@ function createGameState() {
                 level: state.level,
                 readyCount: state.readyCount,
                 activePackName: state.activePackName,
-                activePackId: state.activePackId
+                activePackId: state.activePackId,
+                roundResult: state.roundResult || s.roundResult
             })),
         startGame: (hand: Card[], board: Card[]) => update(s => ({ ...s, gameState: 'PLAYING', hand, board, roundResult: null })),
         setHand: (hand: Card[]) => update(s => ({ ...s, hand })),
@@ -56,7 +57,8 @@ function createGameState() {
             hand: hand,
             roomCode: state.code,
             playerId: playerId,
-            isConnected: true
+            isConnected: true,
+            roundResult: state.roundResult || null
         })),
         reset: () => set(initialState)
     };

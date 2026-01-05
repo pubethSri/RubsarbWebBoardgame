@@ -29,7 +29,7 @@
         try {
             // @ts-ignore
             const res = await fetch("/api/admin/packs", {
-                headers: { "x-auth-token": $authStore.token },
+                headers: { "x-auth-token": $authStore?.token || "" },
             });
 
             if (res.ok) {
@@ -99,21 +99,23 @@
     class="flex flex-col gap-6 w-full max-w-4xl mx-auto pb-12 text-black relative"
 >
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between mb-8">
         <div class="flex items-center gap-4">
             <button
                 onclick={onBack}
-                class="p-2 border-2 border-black bg-white rounded hover:bg-gray-100 transition-colors"
+                class="p-2 border-2 border-black bg-white hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0px_0px_#000000]"
             >
                 <ArrowLeft size={24} />
             </button>
             <h1
-                class="text-3xl font-black uppercase tracking-widest flex items-center gap-2"
+                class="text-4xl font-black uppercase tracking-widest flex items-center gap-2 bg-primary-red text-white border-4 border-black px-4 py-1 -rotate-1 shadow-[4px_4px_0px_0px_#000000]"
             >
                 <ShieldAlert size={32} /> Admin
             </h1>
         </div>
-        <div class="font-mono text-xs opacity-50">v{APP_VERSION}</div>
+        <div class="font-mono text-xs opacity-50 bg-black text-white px-2 py-1">
+            v{APP_VERSION}
+        </div>
     </div>
 
     {#if errorMsg}
@@ -127,18 +129,20 @@
         </div>
     {:else}
         <div
-            class="bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden"
+            class="bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000000] overflow-hidden"
         >
             <div
-                class="p-4 bg-gray-50 border-b-2 border-black flex justify-between items-center"
+                class="p-4 bg-primary-yellow border-b-4 border-black flex justify-between items-center"
             >
-                <span class="font-bold">Total Packs: {packs.length}</span>
+                <span class="font-bold font-mono uppercase text-lg"
+                    >Total Packs: {packs.length}</span
+                >
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr
-                            class="bg-black text-white uppercase text-xs tracking-wider"
+                            class="bg-black text-white uppercase text-xs tracking-wider font-mono"
                         >
                             <th class="p-4 font-bold">Pack Name</th>
                             <th class="p-4 font-bold">Code</th>
@@ -152,33 +156,32 @@
                     <tbody>
                         {#each packs as pack (pack.id)}
                             <tr
-                                class="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                                class="border-b-2 border-black hover:bg-yellow-50 transition-colors font-mono text-sm"
                             >
-                                <td class="p-4 font-bold">{pack.name}</td>
-                                <td class="p-4 font-mono font-bold text-black"
+                                <td class="p-4 font-bold uppercase"
+                                    >{pack.name}</td
+                                >
+                                <td class="p-4 font-bold text-black"
                                     >{pack.share_code || "-"}</td
                                 >
-                                <td class="p-4 font-mono text-sm"
-                                    >{pack.author}</td
-                                >
-                                <td class="p-4 text-center"
+                                <td class="p-4 uppercase">{pack.author}</td>
+                                <td class="p-4 text-center font-bold"
                                     >{pack.topic_count}</td
                                 >
                                 <td class="p-4 text-center">
                                     {#if pack.is_official}
                                         <span
-                                            class="bg-black text-white px-2 py-1 rounded text-[10px] font-bold"
+                                            class="bg-primary-blue text-white border border-black px-2 py-1 text-[10px] font-bold shadow-[2px_2px_0px_0px_#000000]"
                                             >OFFICIAL</span
                                         >
                                     {:else}
                                         <span
-                                            class="bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold"
+                                            class="bg-white text-black border border-black px-2 py-1 text-[10px] font-bold"
                                             >UGC</span
                                         >
                                     {/if}
                                 </td>
-                                <td
-                                    class="p-4 text-right font-mono text-xs text-gray-500"
+                                <td class="p-4 text-right text-xs text-gray-500"
                                     >{formatDate(pack.created_at)}</td
                                 >
                                 <td
@@ -186,14 +189,14 @@
                                 >
                                     <button
                                         onclick={() => viewTopics(pack)}
-                                        class="px-2 py-1 text-xs border border-black rounded hover:bg-black hover:text-white transition-colors"
+                                        class="px-2 py-1 text-xs border-2 border-black bg-white hover:bg-black hover:text-white transition-colors font-bold uppercase shadow-[2px_2px_0px_0px_#000000] active:translate-y-px active:shadow-none"
                                     >
                                         View
                                     </button>
                                     {#if !pack.is_official}
                                         <button
                                             onclick={() => deletePack(pack.id)}
-                                            class="p-1 text-black hover:bg-gray-200 rounded border border-transparent hover:border-black transition-all"
+                                            class="p-1 text-black bg-white border-2 border-black hover:bg-red-500 hover:text-white transition-colors shadow-[2px_2px_0px_0px_#000000] active:translate-y-px active:shadow-none"
                                             title="Delete Pack"
                                         >
                                             <Trash2 size={16} />
@@ -223,39 +226,48 @@
             transition:slide
         >
             <div
-                class="bg-white border-4 border-black rounded-xl p-6 w-full max-w-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-h-[80vh] flex flex-col"
+                class="bg-white border-4 border-black p-6 w-full max-w-2xl shadow-[12px_12px_0px_0px_#000000] max-h-[80vh] flex flex-col relative"
             >
-                <div class="flex justify-between items-start mb-4">
+                <div
+                    class="flex justify-between items-start mb-4 border-b-4 border-black pb-4"
+                >
                     <div>
-                        <h2 class="text-2xl font-black uppercase">
+                        <h2
+                            class="text-3xl font-black uppercase font-mono bg-primary-yellow inline-block px-2 border-2 border-black"
+                        >
                             {selectedPack?.name}
                         </h2>
-                        <p class="text-gray-500 font-mono text-sm">
-                            by {selectedPack?.author}
+                        <p
+                            class="text-gray-500 font-mono text-sm mt-1 font-bold"
+                        >
+                            by <span class="text-black uppercase"
+                                >{selectedPack?.author}</span
+                            >
                         </p>
                     </div>
                     <button
                         onclick={closeModal}
-                        class="p-1 hover:bg-gray-100 rounded border-2 border-transparent hover:border-black transition-all"
+                        class="p-2 border-2 border-black hover:bg-black hover:text-white transition-all shadow-[2px_2px_0px_0px_#000000]"
                     >
                         <ArrowLeft size={24} />
                     </button>
                 </div>
 
-                <div
-                    class="overflow-y-auto flex-1 border-t-2 border-black pt-4 flex flex-col gap-2"
-                >
+                <div class="overflow-y-auto flex-1 flex flex-col gap-2 pr-2">
                     {#each selectedTopics as topic, i}
                         <div
-                            class="flex gap-4 p-3 bg-gray-50 border border-gray-200 rounded"
+                            class="flex gap-4 p-3 bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000000] items-center"
                         >
-                            <span class="font-mono font-bold text-gray-400"
+                            <span
+                                class="font-mono font-bold text-white bg-black w-8 h-8 flex items-center justify-center border-2 border-black"
                                 >#{i + 1}</span
                             >
-                            <span class="font-medium">{topic.topic}</span>
+                            <span class="font-medium font-mono uppercase"
+                                >{topic.topic}</span
+                            >
                             {#if topic.type === "SPICY"}
                                 <span
-                                    class="ml-auto text-[10px] bg-black text-white px-2 py-1 rounded font-bold self-start"
+                                    class="ml-auto text-[10px] bg-primary-red text-white border-2 border-black px-2 py-1 font-bold self-center shadow-[2px_2px_0px_0px_#000000]"
                                     >SPICY</span
                                 >
                             {/if}

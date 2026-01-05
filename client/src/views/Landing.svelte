@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { type Snippet } from "svelte";
     import { socketStore } from "../lib/stores/socket";
     import { gameState } from "../lib/stores/gameState";
 
@@ -6,8 +7,9 @@
     import Admin from "./Admin.svelte";
     import LoginModal from "../components/LoginModal.svelte";
     import HowToPlayModal from "../components/HowToPlayModal.svelte";
+    import Button from "../components/UI/Button.svelte";
     import { authStore, logout } from "../lib/stores/auth";
-    import { HelpCircle } from "lucide-svelte";
+    import { HelpCircle, Star, Zap, Trash2 } from "lucide-svelte";
 
     let playerName = $state("");
     let roomCode = $state("");
@@ -38,145 +40,211 @@
     <Admin onBack={() => (viewMode = "HOME")} />
 {:else}
     <div
-        class="flex flex-col items-center justify-center min-h-screen p-4 bg-white text-black"
+        class="min-h-screen bg-primary-yellow relative overflow-hidden flex flex-col"
     >
-        <h1 class="text-6xl font-bold mb-8 text-black tracking-tight">
-            Rubsarb
-        </h1>
+        <!-- Decoration Background -->
+        <div
+            class="absolute inset-0 z-0 opacity-10 pointer-events-none"
+            style="background-image: radial-gradient(#000 2px, transparent 2px); background-size: 20px 20px;"
+        ></div>
+
+        <!-- Large Marquee Header -->
+        <div
+            class="w-full bg-black text-white py-4 overflow-hidden border-b-4 border-black z-10"
+        >
+            <h1
+                class="text-6xl md:text-8xl font-black font-mono tracking-tighter whitespace-nowrap animate-marquee"
+            >
+                RUBSARB · BOARDGAME · RUBSARB · BOARDGAME · RUBSARB · BOARDGAME
+                ·
+            </h1>
+        </div>
 
         <div
-            class="w-full max-w-md p-8 bg-white rounded-xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+            class="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-4xl mx-auto"
         >
-            <div class="mb-6">
-                <label
-                    class="block text-sm font-bold mb-2 text-black uppercase tracking-wider"
-                    for="name"
-                >
-                    Your Name
-                </label>
-                <input
-                    id="name"
-                    type="text"
-                    bind:value={playerName}
-                    placeholder="Enter your name"
-                    class="w-full px-4 py-3 rounded-lg border-2 border-black focus:bg-gray-50 outline-none text-lg font-medium text-black placeholder:text-gray-400 transition-all"
-                />
-            </div>
-
-            {#if $gameState.error}
+            <!-- Main Content Box -->
+            <div
+                class="w-full max-w-lg bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000000] p-8 relative"
+            >
+                <!-- Decorative Badge -->
                 <div
-                    class="mb-4 p-3 bg-black text-white border-2 border-dashed border-gray-500 font-bold rounded text-center text-sm"
+                    class="absolute -top-6 -right-6 bg-primary-blue text-white p-3 border-4 border-black shadow-[4px_4px_0px_0px_#000000] rotate-12 z-20"
                 >
-                    ⚠️ {$gameState.error}
+                    <Star class="fill-current w-8 h-8" />
                 </div>
-            {/if}
 
-            {#if viewMode === "HOME"}
-                <button
-                    onclick={createRoom}
-                    class="w-full py-4 rounded-xl bg-black text-white font-bold text-xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-1 transition-all hover:bg-gray-800 mb-4 cursor-pointer"
-                >
-                    Create New Room
-                </button>
-
-                <button
-                    onclick={() => (viewMode = "JOIN")}
-                    class="w-full py-4 rounded-xl bg-white border-2 border-black text-black font-bold text-xl hover:bg-gray-50 transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-1"
-                >
-                    Join Existing Room
-                </button>
-
-                {#if $authStore && ($authStore.role === "CREATOR" || $authStore.role === "ADMIN")}
-                    <div
-                        class="mt-4 pt-4 border-t-2 border-dashed border-gray-300 animate-in fade-in"
-                    >
-                        <button
-                            onclick={() => (viewMode = "CREATE_PACK")}
-                            class="w-full py-2 text-sm font-bold text-gray-500 hover:text-black hover:underline transition-all"
-                        >
-                            Or create your own Topics Pack?
-                        </button>
-                    </div>
-                {/if}
-            {:else if viewMode === "JOIN"}
-                <div class="mb-6 animate-in fade-in slide-in-from-bottom-2">
-                    <label
-                        class="block text-sm font-bold mb-2 text-black uppercase tracking-wider"
-                        for="code"
-                    >
-                        Room Code
+                <!-- Input Section -->
+                <div class="mb-8 space-y-4">
+                    <label class="brutal-text text-xl block" for="name">
+                        WHO ARE YOU?
                     </label>
                     <input
-                        id="code"
+                        id="name"
                         type="text"
-                        bind:value={roomCode}
-                        placeholder="ABCD"
-                        maxlength="4"
-                        class="w-full px-4 py-3 rounded-lg border-2 border-black focus:bg-gray-50 outline-none text-lg font-medium text-black placeholder:text-gray-400 uppercase tracking-widest text-center transition-all"
+                        bind:value={playerName}
+                        placeholder="ENTER NAME..."
+                        class="w-full h-14 bg-gray-100 border-4 border-black px-4 font-mono text-xl focus:bg-white placeholder:text-gray-400 transition-colors uppercase"
                     />
                 </div>
 
-                <div class="flex gap-3">
-                    <button
-                        onclick={() => (viewMode = "HOME")}
-                        class="flex-1 py-3 rounded-xl bg-white border-2 border-black text-black font-bold hover:bg-gray-50 transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-1"
+                {#if $gameState.error}
+                    <div
+                        class="mb-6 p-4 bg-primary-red text-white border-4 border-black font-mono font-bold flex items-center gap-3 shadow-[4px_4px_0px_0px_#000000]"
                     >
-                        Back
-                    </button>
-                    <button
-                        onclick={joinRoom}
-                        class="flex-[2] py-3 rounded-xl bg-black border-2 border-black text-white font-bold text-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] active:shadow-none active:translate-y-1 transition-all hover:bg-gray-800 cursor-pointer"
-                    >
-                        Join Room
-                    </button>
+                        <Zap class="fill-white" />
+                        {$gameState.error}
+                    </div>
+                {/if}
+
+                <div class="space-y-4">
+                    {#if viewMode === "HOME"}
+                        <Button
+                            variant="primary"
+                            size="lg"
+                            fullWidth
+                            onclick={createRoom}
+                            class="text-2xl"
+                        >
+                            CREATE ROOM
+                        </Button>
+
+                        <div class="relative">
+                            <div class="absolute inset-0 flex items-center">
+                                <div
+                                    class="w-full border-t-4 border-black"
+                                ></div>
+                            </div>
+                            <div class="relative flex justify-center text-sm">
+                                <span
+                                    class="bg-white px-2 font-mono font-bold text-black border-2 border-black"
+                                    >OR</span
+                                >
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            fullWidth
+                            onclick={() => (viewMode = "JOIN")}
+                            class="text-2xl"
+                        >
+                            JOIN ROOM
+                        </Button>
+
+                        {#if $authStore && ($authStore.role === "CREATOR" || $authStore.role === "ADMIN")}
+                            <div
+                                class="pt-4 mt-4 border-t-4 border-black/10 border-dashed"
+                            >
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    fullWidth
+                                    onclick={() => (viewMode = "CREATE_PACK")}
+                                >
+                                    Build Custom Pack →
+                                </Button>
+                            </div>
+                        {/if}
+                    {:else if viewMode === "JOIN"}
+                        <div
+                            class="space-y-4 animate-in slide-in-from-right duration-200"
+                        >
+                            <div>
+                                <label
+                                    class="brutal-text text-lg block mb-2"
+                                    for="code">ROOM CODE</label
+                                >
+                                <input
+                                    id="code"
+                                    type="text"
+                                    bind:value={roomCode}
+                                    placeholder="ABCD"
+                                    maxlength="4"
+                                    class="w-full h-16 text-center text-4xl font-mono font-bold border-4 border-black uppercase tracking-[0.5em] focus:bg-yellow-50 placeholder:tracking-normal placeholder:text-gray-300"
+                                />
+                            </div>
+
+                            <div class="flex gap-4">
+                                <Button
+                                    variant="outline"
+                                    class="w-1/3"
+                                    onclick={() => (viewMode = "HOME")}
+                                >
+                                    BACK
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    class="flex-1"
+                                    onclick={joinRoom}
+                                >
+                                    JOIN
+                                </Button>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
-            {/if}
+            </div>
         </div>
 
-        <!-- How To Play (Top Left) -->
-        <div class="fixed top-4 left-4">
-            <button
+        <!-- How To Play (Fixed) -->
+        <div class="fixed top-24 left-4 md:top-8 md:left-8 z-50">
+            <Button
+                variant="accent"
+                size="sm"
                 onclick={() => (showHowToPlay = true)}
-                class="flex items-center gap-2 text-xs font-bold hover:underline opacity-60 hover:opacity-100 transition-opacity"
+                class="rotate-[-2deg] hover:rotate-0"
             >
-                <HelpCircle size={16} /> HOW TO PLAY
-            </button>
+                <HelpCircle size={20} class="mr-2" /> HOW TO PLAY??
+            </Button>
         </div>
 
-        <!-- Auth Controls -->
-        <div class="fixed top-4 right-4 flex gap-4 items-center">
+        <!-- Auth Controls (Fixed) -->
+        <div class="fixed top-24 right-4 md:top-8 md:right-8 z-50">
             {#if $authStore}
-                <div class="text-xs font-mono">
-                    <span class="font-bold">{$authStore.username}</span>
-                    <span class="opacity-50">({$authStore.role})</span>
-                </div>
-                <button
-                    onclick={logout}
-                    class="text-xs underline hover:bg-black hover:text-white px-1"
+                <div
+                    class="flex items-center gap-2 bg-white border-4 border-black p-2 shadow-[4px_4px_0px_0px_#000000]"
                 >
-                    Logout
-                </button>
+                    <div class="font-mono text-sm">
+                        <span class="font-bold block leading-none"
+                            >{$authStore.username}</span
+                        >
+                        <span class="text-[10px] text-gray-500 uppercase"
+                            >{$authStore.role}</span
+                        >
+                    </div>
+                    <button
+                        onclick={logout}
+                        class="bg-black text-white p-1 hover:bg-primary-red transition-colors"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
             {:else}
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onclick={() => (showLogin = true)}
-                    class="text-xs font-bold hover:underline"
+                    class="bg-white border-4 border-black shadow-[4px_4px_0px_0px_#000000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
                 >
                     LOGIN
-                </button>
+                </Button>
             {/if}
         </div>
 
-        <!-- Admin / Creator Links -->
-        <div class="fixed bottom-2 right-2 flex flex-col items-end gap-1">
-            {#if $authStore?.role === "ADMIN"}
-                <button
+        <!-- Admin Link -->
+        {#if $authStore?.role === "ADMIN"}
+            <div class="fixed bottom-4 right-4 z-50">
+                <Button
+                    variant="secondary"
+                    size="sm"
                     onclick={() => (viewMode = "ADMIN")}
-                    class="text-[10px] text-gray-400 hover:text-black font-bold font-mono uppercase border border-transparent hover:border-black px-1"
                 >
-                    Admin Dashboard
-                </button>
-            {/if}
-        </div>
+                    ADMIN DASHBOARD
+                </Button>
+            </div>
+        {/if}
     </div>
 
     {#if showLogin}
