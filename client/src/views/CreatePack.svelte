@@ -26,21 +26,65 @@
 
     let packName = $state("");
     let authorName = $state("");
-    let topics: { id: string; topic: string; type: "NORMAL" | "SPICY" }[] =
-        $state([
-            { id: generateUUID(), topic: "", type: "NORMAL" },
-            { id: generateUUID(), topic: "", type: "NORMAL" },
-            { id: generateUUID(), topic: "", type: "NORMAL" },
-            { id: generateUUID(), topic: "", type: "NORMAL" },
-            { id: generateUUID(), topic: "", type: "NORMAL" },
-        ]);
+    let topics: {
+        id: string;
+        topic: string;
+        type: "NORMAL" | "SPICY";
+        minLabel: string;
+        maxLabel: string;
+    }[] = $state([
+        {
+            id: generateUUID(),
+            topic: "",
+            type: "NORMAL",
+            minLabel: "",
+            maxLabel: "",
+        },
+        {
+            id: generateUUID(),
+            topic: "",
+            type: "NORMAL",
+            minLabel: "",
+            maxLabel: "",
+        },
+        {
+            id: generateUUID(),
+            topic: "",
+            type: "NORMAL",
+            minLabel: "",
+            maxLabel: "",
+        },
+        {
+            id: generateUUID(),
+            topic: "",
+            type: "NORMAL",
+            minLabel: "",
+            maxLabel: "",
+        },
+        {
+            id: generateUUID(),
+            topic: "",
+            type: "NORMAL",
+            minLabel: "",
+            maxLabel: "",
+        },
+    ]);
 
     let isSubmitting = $state(false);
     let errorMsg = $state("");
     let successMsg = $state("");
 
     function addTopic() {
-        topics = [...topics, { id: generateUUID(), topic: "", type: "NORMAL" }];
+        topics = [
+            ...topics,
+            {
+                id: generateUUID(),
+                topic: "",
+                type: "NORMAL",
+                minLabel: "",
+                maxLabel: "",
+            },
+        ];
     }
 
     function removeTopic(id: string) {
@@ -77,6 +121,8 @@
                     topics: validTopics.map((t) => ({
                         topic: t.topic,
                         type: t.type,
+                        minLabel: t.minLabel,
+                        maxLabel: t.maxLabel,
                     })),
                 }),
             });
@@ -191,28 +237,58 @@
                 <div
                     animate:flip={{ duration: 300 }}
                     transition:slide|local
-                    class="flex items-center gap-2 group"
+                    class="flex flex-col gap-2 group border-4 border-black p-4 bg-white shadow-[4px_4px_0px_0px_#ccc]"
                 >
-                    <div
-                        class="px-3 py-3 bg-black text-white font-mono font-bold border-2 border-black"
-                    >
-                        {topics.indexOf(topic) + 1}
+                    <div class="flex items-center gap-2">
+                        <div
+                            class="px-3 py-3 bg-black text-white font-mono font-bold border-2 border-black"
+                        >
+                            {topics.indexOf(topic) + 1}
+                        </div>
+                        <input
+                            bind:value={topic.topic}
+                            type="text"
+                            placeholder="TOPIC TEXT..."
+                            class="flex-1 border-4 border-black p-2 font-mono uppercase focus:bg-yellow-50 focus:outline-none placeholder:text-gray-300"
+                            maxlength="200"
+                        />
+                        <button
+                            onclick={() => removeTopic(topic.id)}
+                            disabled={topics.length <= 5}
+                            class="p-3 text-black border-2 border-transparent hover:border-black hover:bg-primary-red hover:text-white transition-colors disabled:opacity-20"
+                            title="Remove Topic"
+                        >
+                            <X size={20} />
+                        </button>
                     </div>
-                    <input
-                        bind:value={topic.topic}
-                        type="text"
-                        placeholder="TOPIC TEXT..."
-                        class="flex-1 border-4 border-black p-2 font-mono uppercase focus:bg-yellow-50 focus:outline-none placeholder:text-gray-300"
-                        maxlength="200"
-                    />
-                    <button
-                        onclick={() => removeTopic(topic.id)}
-                        disabled={topics.length <= 5}
-                        class="p-3 text-black border-2 border-transparent hover:border-black hover:bg-primary-red hover:text-white transition-colors disabled:opacity-20"
-                        title="Remove Topic"
-                    >
-                        <X size={20} />
-                    </button>
+
+                    <!-- Extra Options -->
+                    <div class="flex gap-4 pl-12">
+                        <div class="flex-1 flex flex-col">
+                            <label
+                                class="text-[10px] font-bold uppercase text-gray-500"
+                                >Min Label</label
+                            >
+                            <input
+                                bind:value={topic.minLabel}
+                                placeholder="Min (e.g. Worst)"
+                                maxlength="15"
+                                class="border-b-2 border-gray-300 focus:border-black outline-none font-mono text-sm py-1"
+                            />
+                        </div>
+                        <div class="flex-1 flex flex-col">
+                            <label
+                                class="text-[10px] font-bold uppercase text-gray-500"
+                                >Max Label</label
+                            >
+                            <input
+                                bind:value={topic.maxLabel}
+                                placeholder="Max (e.g. Best)"
+                                maxlength="15"
+                                class="border-b-2 border-gray-300 focus:border-black outline-none font-mono text-sm py-1"
+                            />
+                        </div>
+                    </div>
                 </div>
             {/each}
         </div>

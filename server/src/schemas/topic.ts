@@ -6,7 +6,9 @@ export const CreatePackSchema = z.object({
     topics: z.array(
         z.object({
             topic: z.string().min(1).max(200),
-            type: z.enum(['NORMAL', 'SPICY']).default('NORMAL')
+            type: z.enum(['NORMAL', 'SPICY']).default('NORMAL'),
+            minLabel: z.string().max(15).optional(),
+            maxLabel: z.string().max(15).optional()
         })
     ).min(5).max(50)
 });

@@ -296,7 +296,7 @@ const app = new Elysia()
             const updateShareCode = db.prepare("UPDATE packs SET share_code = ? WHERE id = ?");
 
             const insertTopic = db.prepare(`
-                INSERT INTO topics (id, pack_id, topic, type, min_label, max_label) VALUES (?, ?, ?, ?, 'Min', 'Max')
+                INSERT INTO topics (id, pack_id, topic, type, min_label, max_label) VALUES (?, ?, ?, ?, ?, ?)
             `);
 
             // Generate 6-char share code OUTSIDE transaction to be available for return
@@ -307,7 +307,14 @@ const app = new Elysia()
                 updateShareCode.run(code, packId);
 
                 for (const t of topics) {
-                    insertTopic.run(crypto.randomUUID(), packId, t.topic, t.type);
+                    insertTopic.run(
+                        crypto.randomUUID(),
+                        packId,
+                        t.topic,
+                        t.type,
+                        t.minLabel || 'Min',
+                        t.maxLabel || 'Max'
+                    );
                 }
             });
 
