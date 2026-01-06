@@ -1,7 +1,7 @@
 import type { Context } from 'elysia';
 
-const RATE_LIMIT_WINDOW = 10 * 60 * 1000; // 10 minutes
-const MAX_REQUESTS = 5; // 5 packs per 10 mins
+const RATE_LIMIT_WINDOW = 1 * 60 * 1000; // 1 minute
+const MAX_REQUESTS = 10; // Effectively disabled
 
 const ipMap = new Map<string, number[]>();
 
