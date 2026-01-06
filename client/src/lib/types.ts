@@ -5,7 +5,20 @@ export interface Player {
     cardCount?: number;
     token: string;
     isConnected: boolean;
+    color: string;
 }
+
+export const PLAYER_COLORS = [
+    "#FF0000", // Red
+    "#0000FF", // Blue
+    "#00FF00", // Green
+    "#FFA500", // Orange
+    "#800080", // Purple
+    "#FFC0CB", // Pink
+    "#00FFFF", // Cyan
+    "#A52A2A", // Brown
+    "#808080", // Gray
+];
 
 export interface Card {
     id: string;
@@ -70,7 +83,9 @@ export type WsMessage =
     | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
     | { type: 'REVEAL_NEXT'; payload: null }
     | { type: 'PLAYER_READY'; payload: null }
-    | { type: 'RECONNECT'; payload: { token: string; roomId: string } };
+    | { type: 'PLAYER_READY'; payload: null }
+    | { type: 'RECONNECT'; payload: { token: string; roomId: string } }
+    | { type: 'CHANGE_COLOR'; payload: { color: string } };
 
 export type WsResponse =
     | { type: 'ROOM_UPDATED'; payload: RoomState }

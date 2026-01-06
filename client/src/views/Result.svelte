@@ -23,6 +23,12 @@
         );
     }
 
+    function getPlayerColor(playerId: string) {
+        return (
+            $gameState.players.find((p) => p.id === playerId)?.color || "#000"
+        );
+    }
+
     function sendReady() {
         if (!isReady) {
             isReady = true;
@@ -133,8 +139,9 @@
                     >
                 {/if}
                 <span
-                    class="text-[10px] font-bold mt-1 bg-black text-white px-2 border border-black"
+                    class="text-[10px] font-bold mt-1 text-white px-2 border border-black shadow-[2px_2px_0px_0px_#000000]"
                     class:border-white={result === "LOSS"}
+                    style="background-color: {getPlayerColor(card.playerId)}"
                 >
                     {getPlayerName(card.playerId)}
                 </span>

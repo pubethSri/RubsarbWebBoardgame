@@ -180,6 +180,16 @@ const app = new Elysia()
                 }
             }
 
+            if (msg.type === 'CHANGE_COLOR') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.changeColor(session.playerId, msg.payload.color);
+                    }
+                }
+            }
+
             if (msg.type === 'RECONNECT') {
                 const room = roomManager.getRoom(msg.payload.roomId);
                 if (room) {
@@ -404,6 +414,51 @@ const app = new Elysia()
                     const topics = db.query("SELECT * FROM topics WHERE pack_id = ?").all(id);
                     return topics;
                 } catch (e) {
+                    set.status = 500;
+                    return "Database Error";
+                }
+            })
+            .put("/packs/:id/topics", ({ params: { id }, body, set }) => {
+                const { topics } = body as { topics: any[] };
+
+                if (!topics || !Array.isArray(topics) || topics.length < 5) {
+                    set.status = 400;
+                    return "At least 5 topics required";
+                }
+
+                // Basic validation
+                for (const t of topics) {
+                    if (!t.topic || t.topic.length < 1) {
+                        set.status = 400;
+                        return "Invalid topic data";
+                    }
+                }
+
+                try {
+                    const deleteTopics = db.prepare("DELETE FROM topics WHERE pack_id = ?");
+                    const insertTopic = db.prepare(`
+                        INSERT INTO topics (id, pack_id, topic, type, min_label, max_label) VALUES (?, ?, ?, ?, ?, ?)
+                    `);
+
+                    const transaction = db.transaction(() => {
+                        deleteTopics.run(id);
+                        for (const t of topics) {
+                            insertTopic.run(
+                                crypto.randomUUID(),
+                                id,
+                                t.topic,
+                                t.type || 'NORMAL',
+                                t.minLabel || 'Min',
+                                t.maxLabel || 'Max'
+                            );
+                        }
+                    });
+
+                    transaction();
+                    return { success: true };
+
+                } catch (e) {
+                    console.error(e);
                     set.status = 500;
                     return "Database Error";
                 }

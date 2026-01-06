@@ -5,6 +5,7 @@
     import HostGuideModal from "../components/HostGuideModal.svelte";
     import Button from "../components/UI/Button.svelte";
     import { HelpCircle, Crown, User, Star } from "lucide-svelte";
+    import { PLAYER_COLORS } from "../lib/types";
 
     // No need for $state for store subscriptions in Svelte 5 if using auto-subscription in template
     // But we can derive values if needed.
@@ -186,11 +187,71 @@
                         class="relative bg-white border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000000] flex items-center gap-4 transition-all"
                         class:bg-yellow-50={player.id === $gameState.playerId}
                     >
-                        <!-- Avatar -->
-                        <div
-                            class="w-12 h-12 bg-black text-white border-2 border-black flex items-center justify-center font-mono font-bold text-xl"
-                        >
-                            {player.name.charAt(0).toUpperCase()}
+                        <!-- Avatar with Color -->
+                        <div class="relative">
+                            <button
+                                disabled={player.id !== $gameState.playerId}
+                                onclick={() => {
+                                    if (player.id === $gameState.playerId) {
+                                        // Find next available color
+                                        const currentIndex =
+                                            PLAYER_COLORS.indexOf(
+                                                player.color ||
+                                                    PLAYER_COLORS[0],
+                                            );
+                                        let nextIndex =
+                                            (currentIndex + 1) %
+                                            PLAYER_COLORS.length;
+
+                                        // Loop to find next untaken color
+                                        let attempts = 0;
+                                        while (
+                                            attempts < PLAYER_COLORS.length
+                                        ) {
+                                            const candidateColor =
+                                                PLAYER_COLORS[nextIndex];
+                                            const isTaken =
+                                                $gameState.players.some(
+                                                    (p) =>
+                                                        p.color ===
+                                                            candidateColor &&
+                                                        p.id !== player.id,
+                                                );
+
+                                            if (!isTaken) {
+                                                socketStore.sendMessage({
+                                                    type: "CHANGE_COLOR",
+                                                    payload: {
+                                                        color: candidateColor,
+                                                    },
+                                                });
+                                                break;
+                                            }
+
+                                            nextIndex =
+                                                (nextIndex + 1) %
+                                                PLAYER_COLORS.length;
+                                            attempts++;
+                                        }
+                                    }
+                                }}
+                                class="w-12 h-12 border-2 border-black flex items-center justify-center font-mono font-bold text-xl text-white shadow-[2px_2px_0px_0px_#000000] transition-transform active:translate-y-1 active:shadow-none"
+                                style="background-color: {player.color ||
+                                    '#000'}"
+                                class:cursor-pointer={player.id ===
+                                    $gameState.playerId}
+                                class:hover:opacity-80={player.id ===
+                                    $gameState.playerId}
+                                title={player.id === $gameState.playerId
+                                    ? "Click to change color"
+                                    : ""}
+                            >
+                                {player.name.charAt(0).toUpperCase()}
+                            </button>
+
+                            {#if player.id === $gameState.playerId}
+                                <!-- Tip removed by user request -->
+                            {/if}
                         </div>
 
                         <!-- Info -->

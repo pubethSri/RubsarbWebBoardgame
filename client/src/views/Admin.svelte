@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { ArrowLeft, Trash2, ShieldAlert } from "lucide-svelte";
+    import { ArrowLeft, Trash2, ShieldAlert, Plus } from "lucide-svelte";
     import { slide } from "svelte/transition";
     import { authStore } from "../lib/stores/auth";
     import { onMount } from "svelte";
@@ -70,7 +70,12 @@
                 headers: { "x-auth-token": $authStore!.token },
             });
             if (res.ok) {
-                selectedTopics = await res.json();
+                const rawTopics = await res.json();
+                selectedTopics = rawTopics.map((t: any) => ({
+                    ...t,
+                    minLabel: t.min_label || "Min", // Map DB snake_case to Client camelCase
+                    maxLabel: t.max_label || "Max",
+                }));
                 showModal = true;
             } else {
                 alert("Failed to fetch topics");
@@ -84,6 +89,84 @@
         showModal = false;
         selectedPack = null;
         selectedTopics = [];
+        isEditing = false; // Reset mode
+    }
+
+    let isSaving = false;
+    let isEditing = false;
+
+    function toggleEdit() {
+        isEditing = !isEditing;
+        if (!isEditing) {
+            // Reload to discard changes
+            viewTopics(selectedPack);
+        }
+    }
+
+    function addTopic() {
+        // Generate a temporary ID or just rely on server to re-gen
+        selectedTopics = [
+            ...selectedTopics,
+            {
+                id: crypto.randomUUID(),
+                topic: "",
+                type: "NORMAL",
+                minLabel: "Min",
+                maxLabel: "Max",
+            },
+        ];
+    }
+
+    function removeTopic(index: number) {
+        if (selectedTopics.length <= 5) {
+            alert("Minimum 5 topics required");
+            return;
+        }
+        selectedTopics = selectedTopics.filter((_, i) => i !== index);
+    }
+
+    async function saveTopics() {
+        if (selectedTopics.length < 5) {
+            alert("Minimum 5 topics required");
+            return;
+        }
+
+        // Validate content
+        if (selectedTopics.some((t) => !t.topic.trim())) {
+            alert("All topics must have text");
+            return;
+        }
+
+        isSaving = true;
+        try {
+            const res = await fetch(
+                `/api/admin/packs/${selectedPack.id}/topics`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-auth-token": $authStore!.token,
+                    },
+                    body: JSON.stringify({ topics: selectedTopics }),
+                },
+            );
+
+            if (res.ok) {
+                alert("Topics Updated!");
+                closeModal();
+                // Refresh pack list topic counts if needed
+                fetchPacks();
+            } else {
+                const data = await res.json();
+                alert(
+                    typeof data === "string" ? data : "Failed to update topics",
+                );
+            }
+        } catch (e) {
+            alert("Network Error");
+        } finally {
+            isSaving = false;
+        }
     }
 
     function formatDate(unix: number) {
@@ -231,12 +314,22 @@
                 <div
                     class="flex justify-between items-start mb-4 border-b-4 border-black pb-4"
                 >
-                    <div>
-                        <h2
-                            class="text-3xl font-black uppercase font-mono bg-primary-yellow inline-block px-2 border-2 border-black"
-                        >
-                            {selectedPack?.name}
-                        </h2>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-4">
+                            <h2
+                                class="text-3xl font-black uppercase font-mono bg-primary-yellow inline-block px-2 border-2 border-black"
+                            >
+                                {selectedPack?.name}
+                            </h2>
+                            {#if !isEditing}
+                                <button
+                                    onclick={() => (isEditing = true)}
+                                    class="text-xs bg-black text-white px-2 py-1 font-bold uppercase hover:bg-gray-800"
+                                >
+                                    Edit Topics
+                                </button>
+                            {/if}
+                        </div>
                         <p
                             class="text-gray-500 font-mono text-sm mt-1 font-bold"
                         >
@@ -253,27 +346,118 @@
                     </button>
                 </div>
 
-                <div class="overflow-y-auto flex-1 flex flex-col gap-2 pr-2">
+                <div
+                    class="overflow-y-auto flex-1 flex flex-col gap-2 pr-2 mb-4"
+                >
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold uppercase">
+                            Topics ({selectedTopics.length})
+                        </h3>
+                        {#if isEditing}
+                            <button
+                                onclick={() => addTopic()}
+                                class="px-2 py-1 bg-black text-white text-xs font-bold uppercase hover:bg-gray-800"
+                            >
+                                + Add Topic
+                            </button>
+                        {/if}
+                    </div>
+
                     {#each selectedTopics as topic, i}
                         <div
-                            class="flex gap-4 p-3 bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000000] items-center"
+                            class="flex flex-col gap-2 p-3 bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000000]"
                         >
-                            <span
-                                class="font-mono font-bold text-white bg-black w-8 h-8 flex items-center justify-center border-2 border-black"
-                                >#{i + 1}</span
-                            >
-                            <span class="font-medium font-mono uppercase"
-                                >{topic.topic}</span
-                            >
-                            {#if topic.type === "SPICY"}
+                            <div class="flex items-center gap-2">
                                 <span
-                                    class="ml-auto text-[10px] bg-primary-red text-white border-2 border-black px-2 py-1 font-bold self-center shadow-[2px_2px_0px_0px_#000000]"
-                                    >SPICY</span
+                                    class="font-mono font-bold text-white bg-black w-8 h-8 flex items-center justify-center border-2 border-black shrink-0"
+                                    >#{i + 1}</span
                                 >
-                            {/if}
+                                {#if isEditing}
+                                    <input
+                                        bind:value={topic.topic}
+                                        class="flex-1 border-b-2 border-gray-300 focus:border-black outline-none font-mono uppercase px-1"
+                                        placeholder="Topic Text..."
+                                    />
+                                {:else}
+                                    <span
+                                        class="flex-1 font-mono uppercase font-medium"
+                                        >{topic.topic}</span
+                                    >
+                                {/if}
+
+                                {#if topic.type === "SPICY"}
+                                    <span
+                                        class="text-[10px] bg-primary-red text-white border-2 border-black px-1 py-0.5 font-bold shadow-[2px_2px_0px_0px_#000000]"
+                                        >SPICY</span
+                                    >
+                                {/if}
+
+                                {#if isEditing}
+                                    <button
+                                        onclick={() => removeTopic(i)}
+                                        class="text-red-500 hover:text-red-700 disabled:opacity-30"
+                                        disabled={selectedTopics.length <= 5}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                {/if}
+                            </div>
+
+                            <!-- Min/Max Labels -->
+                            <div class="flex gap-2 pl-10">
+                                {#if isEditing}
+                                    <input
+                                        bind:value={topic.minLabel}
+                                        placeholder="Min Label"
+                                        class="w-1/3 border-b border-gray-200 text-xs font-mono uppercase focus:border-black outline-none"
+                                    />
+                                    <input
+                                        bind:value={topic.maxLabel}
+                                        placeholder="Max Label"
+                                        class="w-1/3 border-b border-gray-200 text-xs font-mono uppercase focus:border-black outline-none"
+                                    />
+                                {:else}
+                                    <div
+                                        class="text-xs text-gray-500 font-mono uppercase flex gap-4"
+                                    >
+                                        <span
+                                            >Min: <span
+                                                class="text-black font-bold"
+                                                >{topic.minLabel}</span
+                                            ></span
+                                        >
+                                        <span
+                                            >Max: <span
+                                                class="text-black font-bold"
+                                                >{topic.maxLabel}</span
+                                            ></span
+                                        >
+                                    </div>
+                                {/if}
+                            </div>
                         </div>
                     {/each}
                 </div>
+
+                {#if isEditing}
+                    <div
+                        class="border-t-4 border-black pt-4 flex justify-end gap-2"
+                    >
+                        <button
+                            onclick={toggleEdit}
+                            class="px-4 py-2 bg-gray-200 text-black font-bold uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000000] hover:translate-y-px hover:shadow-none transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onclick={saveTopics}
+                            disabled={isSaving}
+                            class="px-4 py-2 bg-primary-blue text-white font-bold uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000000] hover:translate-y-px hover:shadow-none transition-all disabled:opacity-50"
+                        >
+                            {isSaving ? "Saving..." : "Save Changes"}
+                        </button>
+                    </div>
+                {/if}
             </div>
         </div>
     {/if}

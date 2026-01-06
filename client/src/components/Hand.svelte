@@ -24,7 +24,7 @@
         // Detect if a new card was DROPPED here (Return to Hand)
         // Checks if 'info.id' is present (the item being dropped)
         // @ts-ignore
-        const droppedCardId = e.detail.info.id;
+        const droppedCardId = e.detail.info?.id;
 
         // We only care if we "received" it.
         // Logic: if it wasn't in our hand before?
@@ -50,11 +50,11 @@
 </script>
 
 <div
-    class="fixed bottom-0 left-0 right-0 p-8 flex justify-center items-end h-64 pointer-events-none"
+    class="fixed bottom-0 left-0 right-0 p-4 md:p-8 flex justify-start md:justify-center items-end h-64 pointer-events-none z-50 overflow-x-auto"
 >
     <!-- Container for DnD -->
     <div
-        class="flex gap-4 pointer-events-auto min-w-[200px] min-h-[160px] items-end justify-center rounded-xl p-4 transition-colors"
+        class="flex gap-4 pointer-events-auto min-w-[200px] min-h-[160px] items-end justify-start md:justify-center rounded-xl p-4 transition-colors shrink-0"
         use:dndzone={{ items: $gameState.hand, flipDurationMs }}
         on:consider={handleDndConsider}
         on:finalize={handleDndFinalize}

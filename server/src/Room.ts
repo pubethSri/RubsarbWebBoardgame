@@ -1,4 +1,4 @@
-import type { Player, RoomState, GameStatus, Card, WsResponse, Topic } from './types';
+import { type Player, type RoomState, type GameStatus, type Card, type WsResponse, type Topic, PLAYER_COLORS } from './types';
 import { TopicManager } from './TopicManager';
 
 const topicManager = new TopicManager();
@@ -19,6 +19,7 @@ export class Room {
     public activePackId: string = "starter_pack";
     public activePackName: string = "The Essentials";
     public roundResult: 'WIN' | 'LOSS' | null = null;
+    private usedTopicIds: Set<string> = new Set();
 
     constructor(code: string) {
         this.code = code;
@@ -28,6 +29,15 @@ export class Room {
         if (this.players.length >= MAX_PLAYERS) {
             throw new Error("Room is full (Max 8 players)");
         }
+
+        // Pick a random color not currently used
+        const usedColors = new Set(this.players.map(p => p.color));
+        const availableColors = PLAYER_COLORS.filter(c => !usedColors.has(c));
+        // Fallback to random if all used (unlikely with 9 colors / 8 players)
+        const color = availableColors.length > 0
+            ? availableColors[Math.floor(Math.random() * availableColors.length)]
+            : PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]!;
+
         const isHost = this.players.length === 0;
         const token = crypto.randomUUID();
         const player: Player = {
@@ -36,7 +46,8 @@ export class Room {
             isHost,
             ws,
             token,
-            isConnected: true
+            isConnected: true,
+            color
         };
         this.players.push(player);
         return player;
@@ -95,9 +106,12 @@ export class Room {
     }
 
     setPack(id: string, name: string) {
-        this.activePackId = id;
-        this.activePackName = name;
-        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+        if (this.activePackId !== id) {
+            this.activePackId = id;
+            this.activePackName = name;
+            this.usedTopicIds.clear(); // Reset used topics when pack changes
+            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+        }
     }
 
     // --- Game Logic ---
@@ -140,7 +154,23 @@ export class Room {
             this.hands.set(player.id, hand);
         });
 
-        const rawTopic = topicManager.getRandomTopic(this.activePackId);
+        // Try to get a unique topic
+        let rawTopic = topicManager.getRandomTopic(this.activePackId, Array.from(this.usedTopicIds));
+
+        if (!rawTopic) {
+            console.log(`[Room ${this.code}] All topics in pack ${this.activePackId} used. Resetting cycle.`);
+            this.usedTopicIds.clear();
+            // Retry once
+            rawTopic = topicManager.getRandomTopic(this.activePackId, []);
+        }
+
+        // Fallback if pack is completely empty or error
+        if (!rawTopic) {
+            rawTopic = { topic: "Error: No Topics Found", min_label: "?", max_label: "?" };
+        } else if (rawTopic.id) {
+            this.usedTopicIds.add(rawTopic.id);
+        }
+
         this.topic = {
             text: rawTopic.topic,
             minRange: rawTopic.min_label,
@@ -359,6 +389,30 @@ export class Room {
                     // Should be caught above, but safe fallback
                 }
             }
+        }
+    }
+
+    changeColor(playerId: string, newColor: string) {
+        // Validate color
+        if (!PLAYER_COLORS.includes(newColor)) return;
+
+        // Check if taken (optional? User said "not the same as the one others already have")
+        // But if they manually switch, maybe we enforce uniqueness too?
+        // User request: "they can click or their icon to change the color if they want"
+        // Implicitly implies availability check.
+        const isTaken = this.players.some(p => p.color === newColor && p.id !== playerId);
+        if (isTaken) {
+            // If taken, maybe pick another random one? or do nothing?
+            // Let's just do nothing for now, client should handle UI to disable used colors maybe?
+            // Or server can rotate to next available?
+            // Let's simplify: Force uniqueness. If requested is taken, ignore.
+            return;
+        }
+
+        const player = this.players.find(p => p.id === playerId);
+        if (player) {
+            player.color = newColor;
+            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
         }
     }
 

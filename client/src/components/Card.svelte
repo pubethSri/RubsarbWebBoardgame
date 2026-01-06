@@ -8,9 +8,10 @@
         card: Card;
         hidden?: boolean;
         ownerName?: string; // Optional: Only shown if provided (e.g. on Board)
+        ownerColor?: string;
     }
 
-    let { card, hidden = false, ownerName }: Props = $props();
+    let { card, hidden = false, ownerName, ownerColor }: Props = $props();
 
     // Editable if: It's MY card AND it's NOT revealed (hidden on board or in hand).
     // Note: 'hidden' prop is passed to toggle visual style, but 'card.isFaceUp' is truth.
@@ -36,7 +37,7 @@
 
 <div class="flex flex-col items-center gap-2">
     <div
-        class="w-32 h-48 border-4 border-black flex flex-col items-center justify-between bg-white shadow-[4px_4px_0px_0px_#000000] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] cursor-grab active:cursor-grabbing font-mono select-none overflow-hidden relative"
+        class="w-24 h-36 md:w-32 md:h-48 border-4 border-black flex flex-col items-center justify-between bg-white shadow-[4px_4px_0px_0px_#000000] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] cursor-grab active:cursor-grabbing font-mono select-none overflow-hidden relative"
         class:bg-black={hidden}
         class:text-white={hidden}
     >
@@ -48,11 +49,21 @@
             ></div>
         {/if}
         <!-- Top: Value -->
-        <div class="flex-1 flex items-center justify-center w-full">
+        <div
+            class="flex-1 flex items-center justify-center w-full relative z-10"
+        >
             {#if hidden}
-                <span class="text-4xl font-bold">?</span>
+                {#if isOwner}
+                    <span
+                        class="text-2xl md:text-4xl font-bold text-gray-500 opacity-50 select-none"
+                        >{card.value}</span
+                    >
+                {/if}
             {:else}
-                <span class="text-4xl font-bold text-black">{card.value}</span>
+                <span
+                    class="text-2xl md:text-4xl font-bold text-black select-none"
+                    >{card.value}</span
+                >
             {/if}
         </div>
 
@@ -71,7 +82,7 @@
                 />
             {:else}
                 <div
-                    class="w-full h-full flex items-center justify-center text-xs text-center p-0 font-sans truncate px-1"
+                    class="w-full h-full flex items-center justify-center text-xs text-center p-0 font-mono font-bold uppercase truncate px-1 text-black"
                 >
                     {card.note || ""}
                 </div>
@@ -81,7 +92,8 @@
 
     {#if ownerName}
         <span
-            class="text-[10px] font-bold text-white bg-black border-2 border-black px-2 py-0.5 shadow-[2px_2px_0px_0px_#000000]"
+            class="text-[10px] font-bold text-white border-2 border-black px-2 py-0.5 shadow-[2px_2px_0px_0px_#000000]"
+            style="background-color: {ownerColor || '#000'}"
         >
             {ownerName}
         </span>

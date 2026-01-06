@@ -59,7 +59,7 @@
         // We need to find which card ID caused this event.
         // svelte-dnd-action usually provides `info` in detail.
         // @ts-ignore
-        const movedCardId = e.detail.info.id;
+        const movedCardId = e.detail.info?.id;
 
         if (movedCardId) {
             const targetIndex = finalBoard.findIndex(
@@ -90,16 +90,16 @@
 <div class="w-full max-w-5xl mx-auto mt-4 relative flex justify-center px-4">
     <!-- Active Drop Zone (The Board) -->
     <div
-        class="w-full min-h-[400px] border-4 border-black border-dashed bg-white flex flex-wrap justify-center content-start gap-4 p-8 transition-colors shadow-[8px_8px_0px_0px_#000000]"
+        class="w-full min-h-[400px] border-4 border-black border-dashed bg-white flex flex-wrap justify-center content-start gap-4 p-4 md:p-8 transition-colors shadow-[8px_8px_0px_0px_#000000] relative"
         use:dndzone={{ items: localBoard, flipDurationMs }}
         on:consider={handleDndConsider}
         on:finalize={handleDndFinalize}
     >
         {#if localBoard.length === 0}
             <div
-                class="w-full h-full flex items-center justify-center text-gray-400 font-black uppercase text-xl tracking-widest pointer-events-none absolute inset-0 opacity-30"
+                class="w-full h-full flex items-center justify-center text-gray-400 font-black uppercase text-xl tracking-widest pointer-events-none absolute inset-0 opacity-30 p-4 text-center"
             >
-                Place cards here in ascending order...
+                Place cards here...
             </div>
         {/if}
 
@@ -115,6 +115,9 @@
                     ownerName={$gameState.players.find(
                         (p) => p.id === card.playerId,
                     )?.name}
+                    ownerColor={$gameState.players.find(
+                        (p) => p.id === card.playerId,
+                    )?.color}
                 />
             </div>
         {/each}

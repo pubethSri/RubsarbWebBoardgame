@@ -1,6 +1,7 @@
 import { db } from './db';
 
 export interface TopicDef {
+    id?: string;
     topic: string;
     min_label: string;
     max_label: string;
@@ -20,22 +21,36 @@ export class TopicManager {
         }
     }
 
-    getRandomTopic(packId: string = "starter_pack"): TopicDef {
+    getRandomTopic(packId: string = "starter_pack", excludeIds: string[] = []): TopicDef | null {
         try {
-            const topic = db.query(`
-                SELECT topic, min_label, max_label
-                FROM topics
-                WHERE pack_id = $packId
-                ORDER BY RANDOM()
-                LIMIT 1
-            `).get({ $packId: packId }) as TopicDef | null;
+            let query = "SELECT id, topic, min_label, max_label FROM topics WHERE pack_id = $packId";
+            const params: any = { $packId: packId };
+
+            if (excludeIds.length > 0) {
+                // Dynamic placeholders for IN clause
+                const placeholders = excludeIds.map((_, i) => `$ex${i}`).join(", ");
+                query += ` AND id NOT IN (${placeholders})`;
+
+                // Bind values
+                excludeIds.forEach((id, i) => {
+                    params[`$ex${i}`] = id;
+                });
+            }
+
+            query += " ORDER BY RANDOM() LIMIT 1";
+
+            const topic = db.query(query).get(params) as TopicDef | null;
 
             if (!topic) {
+                // If we have exclusions and found nothing, it implies we exhausted the pack.
+                // Return null to signal reset.
+                if (excludeIds.length > 0) return null;
+
                 return { topic: "No topics found", min_label: "Error", max_label: "Error" };
             }
 
-            // Handle potentially null labels if DB schema allows it (though we inserted strings)
             return {
+                id: topic.id,
                 topic: topic.topic,
                 min_label: topic.min_label || "Min",
                 max_label: topic.max_label || "Max"

@@ -11,11 +11,53 @@
     import { authStore, logout } from "../lib/stores/auth";
     import { HelpCircle, Star, Zap, Trash2 } from "lucide-svelte";
 
+    import { onMount, onDestroy } from "svelte";
+    import { PLAYER_COLORS } from "../lib/types";
+
+    // ... imports
+
     let playerName = $state("");
     let roomCode = $state("");
     let viewMode = $state<"HOME" | "JOIN" | "CREATE_PACK" | "ADMIN">("HOME");
     let showLogin = $state(false);
     let showHowToPlay = $state(false);
+
+    // Showcase Animation State
+    let demoColorIndex = $state(0);
+    let cursorX = $state(20); // Start offset
+    let cursorY = $state(20);
+    let cursorScale = $state(1);
+    let animationInterval: any;
+
+    onMount(() => {
+        // Animation Loop
+        let step = 0;
+        animationInterval = setInterval(() => {
+            step = (step + 1) % 4;
+
+            if (step === 0) {
+                // Move In
+                cursorX = -10;
+                cursorY = -10;
+                cursorScale = 1;
+            } else if (step === 1) {
+                // Click Down
+                cursorScale = 0.8;
+            } else if (step === 2) {
+                // Color Change & Release
+                cursorScale = 1;
+                demoColorIndex = (demoColorIndex + 1) % PLAYER_COLORS.length;
+            } else if (step === 3) {
+                // Move Away
+                cursorX = 20;
+                cursorY = 20;
+            }
+        }, 1000);
+    });
+
+    onDestroy(() => {
+        if (animationInterval) clearInterval(animationInterval);
+    });
 
     function createRoom() {
         if (!playerName.trim()) return;
@@ -234,8 +276,9 @@
         </div>
 
         <!-- Admin Link -->
+        <!-- Admin Link (Moved to Left) -->
         {#if $authStore?.role === "ADMIN"}
-            <div class="fixed bottom-4 right-4 z-50">
+            <div class="fixed bottom-4 left-4 z-50">
                 <Button
                     variant="secondary"
                     size="sm"
@@ -245,6 +288,48 @@
                 </Button>
             </div>
         {/if}
+
+        <!-- Color Change Showcase (Moved to Right) -->
+        <div
+            class="fixed bottom-4 right-4 z-40 hidden md:flex flex-col items-center gap-2"
+        >
+            <!-- Label (Above) -->
+            <div
+                class="bg-black text-white px-3 py-1 text-[10px] font-bold uppercase -rotate-2 font-mono border-2 border-white shadow-md max-w-[150px] text-center mb-1"
+            >
+                You can click your icon to change color!
+            </div>
+
+            <div class="relative group">
+                <!-- Avatar -->
+                <div
+                    class="w-16 h-16 border-4 border-black flex items-center justify-center font-mono font-bold text-2xl text-white shadow-[4px_4px_0px_0px_#000000] transition-colors duration-200"
+                    style="background-color: {PLAYER_COLORS[demoColorIndex]}"
+                >
+                    ?
+                </div>
+
+                <!-- Cursor Animation -->
+                <div
+                    class="absolute transition-transform duration-500 ease-in-out pointer-events-none drop-shadow-md"
+                    style="transform: translate({cursorX}px, {cursorY}px) scale({cursorScale}); top: 100%; left: 100%;"
+                >
+                    <!-- Simple SVG Cursor -->
+                    <svg
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="black"
+                        stroke="white"
+                        stroke-width="2"
+                    >
+                        <path
+                            d="M5.5 3.21l10.08 5.25c.57.3.62 1.1.09 1.47l-4.13 2.87 2.87 4.13c.27.39.12.92-.32 1.09l-1.99.76c-.44.17-.93-.05-1.09-.49l-2.61-3.77-2.92 4.07c-.42.59-1.34.42-1.48-.29L2.5 4.5c-.17-.89.87-1.48 1.62-.97.55.37 1.38.68 1.38-.32z"
+                        />
+                    </svg>
+                </div>
+            </div>
+        </div>
     </div>
 
     {#if showLogin}
