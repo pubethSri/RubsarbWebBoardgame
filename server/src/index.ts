@@ -400,6 +400,30 @@ const app = new Elysia()
                     return "Database Error";
                 }
             })
+            .patch("/packs/:id", ({ params: { id }, body, set }) => {
+                const { shareCode } = body as { shareCode: string };
+                if (!shareCode || shareCode.length < 3) {
+                    set.status = 400;
+                    return "Invalid Code";
+                }
+
+                const upperCode = shareCode.toUpperCase();
+
+                // Check uniqueness
+                const existing = db.query("SELECT id FROM packs WHERE share_code = ?").get(upperCode) as { id: string } | null;
+                if (existing && existing.id !== id) {
+                    set.status = 409;
+                    return "Code already taken";
+                }
+
+                try {
+                    db.query("UPDATE packs SET share_code = ? WHERE id = ?").run(upperCode, id);
+                    return { success: true, shareCode: upperCode };
+                } catch (e) {
+                    set.status = 500;
+                    return "Database Error";
+                }
+            })
             .delete("/packs/:id", ({ params: { id }, set }) => {
                 try {
                     db.query("DELETE FROM packs WHERE id = ?").run(id);

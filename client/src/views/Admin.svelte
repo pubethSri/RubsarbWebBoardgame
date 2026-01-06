@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { ArrowLeft, Trash2, ShieldAlert, Plus } from "lucide-svelte";
+    import { ArrowLeft, Trash2, ShieldAlert, Plus, Edit } from "lucide-svelte";
     import { slide } from "svelte/transition";
     import { authStore } from "../lib/stores/auth";
     import { onMount } from "svelte";
@@ -103,12 +103,26 @@
         }
     }
 
+    function generateUUID() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+            /[xy]/g,
+            function (c) {
+                var r = (Math.random() * 16) | 0,
+                    v = c == "x" ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            },
+        );
+    }
+
     function addTopic() {
-        // Generate a temporary ID or just rely on server to re-gen
+        // Generate a temporary ID (Pollyfill for HTTP usage)
         selectedTopics = [
             ...selectedTopics,
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 topic: "",
                 type: "NORMAL",
                 minLabel: "Min",
@@ -175,6 +189,33 @@
             " " +
             new Date(unix * 1000).toLocaleTimeString()
         );
+    }
+
+    async function updateShareCode(pack: any) {
+        const newCode = prompt("Enter new 6-character code:", pack.share_code);
+        if (!newCode || newCode.trim().length < 3) return;
+
+        try {
+            const res = await fetch(`/api/admin/packs/${pack.id}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-auth-token": $authStore!.token,
+                },
+                body: JSON.stringify({ shareCode: newCode.trim() }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Code updated to: ${data.shareCode}`);
+                fetchPacks();
+            } else {
+                const err = await res.text();
+                alert(`Failed: ${err}`);
+            }
+        } catch (e) {
+            alert("Network Error");
+        }
     }
 </script>
 
@@ -244,9 +285,19 @@
                                 <td class="p-4 font-bold uppercase"
                                     >{pack.name}</td
                                 >
-                                <td class="p-4 font-bold text-black"
-                                    >{pack.share_code || "-"}</td
-                                >
+                                <td class="p-4 font-bold text-black">
+                                    <div class="flex items-center gap-2">
+                                        {pack.share_code || "-"}
+                                        <button
+                                            onclick={() =>
+                                                updateShareCode(pack)}
+                                            class="opacity-30 hover:opacity-100 transition-opacity"
+                                            title="Edit Share Code"
+                                        >
+                                            <Edit size={14} />
+                                        </button>
+                                    </div>
+                                </td>
                                 <td class="p-4 uppercase">{pack.author}</td>
                                 <td class="p-4 text-center font-bold"
                                     >{pack.topic_count}</td
