@@ -47,5 +47,6 @@ Thumbs.db
 .shared
 ai_context
 
-db/
+./db/
+server/db
 db_data/
