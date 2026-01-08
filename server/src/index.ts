@@ -190,6 +190,16 @@ const app = new Elysia()
                 }
             }
 
+            if (msg.type === 'KICK_PLAYER') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.kickPlayer(msg.payload.playerId, session.playerId);
+                    }
+                }
+            }
+
             if (msg.type === 'RECONNECT') {
                 const room = roomManager.getRoom(msg.payload.roomId);
                 if (room) {

@@ -3,7 +3,7 @@ import { TopicManager } from './TopicManager';
 
 const topicManager = new TopicManager();
 
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 10;
 
 export class Room {
     public code: string;
@@ -65,7 +65,7 @@ export class Room {
             console.log(`⏰ Grace period expired for ${player.name} (${player.id})`);
             this.removePlayer(player.id);
             this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
-        }, 60000);
+        }, 120000);
 
         this.broadcast({ type: 'PLAYER_DC', payload: { playerId: id } });
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
@@ -112,6 +112,47 @@ export class Room {
             this.usedTopicIds.clear(); // Reset used topics when pack changes
             this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
         }
+    }
+
+    kickPlayer(targetId: string, requestorId: string) {
+        const requestor = this.players.find(p => p.id === requestorId);
+        if (!requestor || !requestor.isHost) {
+            console.warn(`[Room ${this.code}] Unauthorized kick attempt by ${requestorId}`);
+            return;
+        }
+
+        if (targetId === requestorId) {
+            console.warn(`[Room ${this.code}] Host cannot kick themselves`);
+            return;
+        }
+
+        const target = this.players.find(p => p.id === targetId);
+        if (!target) return;
+
+        console.log(`[Room ${this.code}] 👢 Player ${target.name} (${target.id}) kicked by host`);
+
+        // Notify everyone
+        this.broadcast({ type: 'PLAYER_KICKED', payload: { playerId: targetId } });
+
+        // Close victim's socket if connected
+        if (target.ws && target.ws.readyState === 1) {
+            target.ws.send(JSON.stringify({ type: 'KICKED', payload: null }));
+            // Do NOT close socket, so they can return to Landing without reconnecting loop
+            // target.ws.close();
+        }
+
+        // Return cards to deck or just discard them?
+        // Logic: if game is playing, their cards in hand are lost.
+        // Cards on board should be removed?
+        // Currently removePlayer just removes the player. 
+        // Board cards remain but might look weird if owner is gone?
+        // Actually removePlayer loop (lines 101) just filters player.
+
+        // Let's check removePlayer logic.
+        this.removePlayer(targetId);
+
+        // Broadcast new state
+        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
 
     // --- Game Logic ---

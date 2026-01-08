@@ -74,6 +74,12 @@ export const socketStore = {
                         }
                         gameState.setError(msg.payload.message);
                         break;
+                    case 'KICKED':
+                        localStorage.removeItem('game_session');
+                        gameState.setError("You have been kicked from the room.");
+                        gameState.leaveRoom();
+                        if (socket) socket.close();
+                        break;
                 }
             } catch (e) {
                 console.error("Error parsing message", e);

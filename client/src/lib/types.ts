@@ -85,7 +85,8 @@ export type WsMessage =
     | { type: 'PLAYER_READY'; payload: null }
     | { type: 'PLAYER_READY'; payload: null }
     | { type: 'RECONNECT'; payload: { token: string; roomId: string } }
-    | { type: 'CHANGE_COLOR'; payload: { color: string } };
+    | { type: 'CHANGE_COLOR'; payload: { color: string } }
+    | { type: 'KICK_PLAYER'; payload: { playerId: string } };
 
 export type WsResponse =
     | { type: 'ROOM_UPDATED'; payload: RoomState }
@@ -95,4 +96,6 @@ export type WsResponse =
     | { type: 'ROUND_ENDED'; payload: { result: 'WIN' | 'LOSS'; board: Card[] } }
     | { type: 'WELCOME_BACK'; payload: { gameState: RoomState; hand: Card[] } }
     | { type: 'PLAYER_DC'; payload: { playerId: string } }
-    | { type: 'PLAYER_RECONNECTED'; payload: { playerId: string } };
+    | { type: 'PLAYER_RECONNECTED'; payload: { playerId: string } }
+    | { type: 'PLAYER_KICKED'; payload: { playerId: string } }
+    | { type: 'KICKED'; payload: null };

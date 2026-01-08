@@ -7,11 +7,18 @@
     interface Props {
         card: Card;
         hidden?: boolean;
+        forceHide?: boolean; // If true, even owner won't see value
         ownerName?: string; // Optional: Only shown if provided (e.g. on Board)
         ownerColor?: string;
     }
 
-    let { card, hidden = false, ownerName, ownerColor }: Props = $props();
+    let {
+        card,
+        hidden = false,
+        forceHide = false,
+        ownerName,
+        ownerColor,
+    }: Props = $props();
 
     // Editable if: It's MY card AND it's NOT revealed (hidden on board or in hand).
     // Note: 'hidden' prop is passed to toggle visual style, but 'card.isFaceUp' is truth.
@@ -53,7 +60,7 @@
             class="flex-1 flex items-center justify-center w-full relative z-10"
         >
             {#if hidden}
-                {#if isOwner}
+                {#if isOwner && !forceHide}
                     <span
                         class="text-2xl md:text-4xl font-bold text-gray-500 opacity-50 select-none"
                         >{card.value}</span

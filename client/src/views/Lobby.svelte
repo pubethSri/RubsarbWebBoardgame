@@ -4,7 +4,8 @@
     import { fade, fly, slide } from "svelte/transition";
     import HostGuideModal from "../components/HostGuideModal.svelte";
     import Button from "../components/UI/Button.svelte";
-    import { HelpCircle, Crown, User, Star } from "lucide-svelte";
+    import ConfirmModal from "../components/ConfirmModal.svelte";
+    import { HelpCircle, Crown, User, Star, UserX } from "lucide-svelte";
     import { PLAYER_COLORS } from "../lib/types";
 
     // No need for $state for store subscriptions in Svelte 5 if using auto-subscription in template
@@ -14,6 +15,10 @@
     let isChangingPack = $state(false);
     let showHostGuide = $state(false);
     let isConfiguring = $state(false);
+
+    // Modal States
+    let showLeaveConfirm = $state(false);
+    let kickTarget: string | null = $state(null); // ID of player to kick
 
     async function changePack() {
         if (!packShareCode || packShareCode.length < 6) return;
@@ -78,7 +83,7 @@
                 <Button
                     variant="outline"
                     size="sm"
-                    onclick={() => socketStore.disconnect()}
+                    onclick={() => (showLeaveConfirm = true)}
                     class="h-full"
                 >
                     LEAVE
@@ -287,6 +292,20 @@
                                 </div>
                             {/if}
                         </div>
+
+                        <!-- Kick Button (Host Only) -->
+                        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost && !player.isHost && player.id !== $gameState.playerId}
+                            <button
+                                onclick={(e) => {
+                                    e.stopPropagation();
+                                    kickTarget = player.id;
+                                }}
+                                class="p-2 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-600 transition-colors rounded-full"
+                                title="Kick Player"
+                            >
+                                <UserX size={20} />
+                            </button>
+                        {/if}
                     </div>
                 {/each}
 
@@ -302,7 +321,35 @@
         </div>
     </div>
 
-    {#if showHostGuide}
-        <HostGuideModal on:close={() => (showHostGuide = false)} />
+    {#if showLeaveConfirm}
+        <ConfirmModal
+            title="Leave Lobby?"
+            message="You will be disconnected from this room."
+            confirmText="Leave"
+            danger={true}
+            on:confirm={() => {
+                socketStore.disconnect();
+                showLeaveConfirm = false;
+            }}
+            on:cancel={() => (showLeaveConfirm = false)}
+        />
+    {/if}
+
+    {#if kickTarget}
+        <ConfirmModal
+            title="Kick Player?"
+            message="They will be removed from the room."
+            confirmText="Kick"
+            danger={true}
+            on:confirm={() => {
+                if (kickTarget)
+                    socketStore.sendMessage({
+                        type: "KICK_PLAYER",
+                        payload: { playerId: kickTarget },
+                    });
+                kickTarget = null;
+            }}
+            on:cancel={() => (kickTarget = null)}
+        />
     {/if}
 </div>

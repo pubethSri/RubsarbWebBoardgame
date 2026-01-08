@@ -9,9 +9,14 @@
         ChevronDown,
         ChevronUp,
         LogOut,
+        UserX,
     } from "lucide-svelte"; // Assuming lucide-svelte is available or we use SVGs
 
+    import ConfirmModal from "./ConfirmModal.svelte";
+
     let isOpen = false;
+    let showLeaveConfirm = false;
+    let kickTarget: string | null = null;
 </script>
 
 <div class="absolute top-4 left-4 z-50">
@@ -83,13 +88,27 @@
                                 title="Disconnected"
                             ></div>
                         {/if}
+
+                        <!-- Kick Button (Host Only) -->
+                        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost && !player.isHost && player.id !== $gameState.playerId}
+                            <button
+                                onclick={(e) => {
+                                    e.stopPropagation();
+                                    kickTarget = player.id;
+                                }}
+                                class="ml-2 p-1 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-600 transition-colors"
+                                title="Kick Player"
+                            >
+                                <UserX size={14} />
+                            </button>
+                        {/if}
                     </div>
                 {/each}
             </div>
 
             <div class="p-2 border-t-2 border-black bg-gray-50">
                 <button
-                    onclick={() => socketStore.disconnect()}
+                    onclick={() => (showLeaveConfirm = true)}
                     class="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold font-mono uppercase bg-black text-white border-2 border-black hover:bg-primary-red transition-colors"
                 >
                     <LogOut size={14} />
@@ -97,5 +116,37 @@
                 </button>
             </div>
         </div>
+    {/if}
+
+    {#if showLeaveConfirm}
+        <ConfirmModal
+            title="Leave Room?"
+            message="You will be disconnected from the game."
+            confirmText="Leave"
+            danger={true}
+            on:confirm={() => {
+                socketStore.disconnect();
+                showLeaveConfirm = false;
+            }}
+            on:cancel={() => (showLeaveConfirm = false)}
+        />
+    {/if}
+
+    {#if kickTarget}
+        <ConfirmModal
+            title="Kick Player?"
+            message="They will be removed from the room."
+            confirmText="Kick"
+            danger={true}
+            on:confirm={() => {
+                if (kickTarget)
+                    socketStore.sendMessage({
+                        type: "KICK_PLAYER",
+                        payload: { playerId: kickTarget },
+                    });
+                kickTarget = null;
+            }}
+            on:cancel={() => (kickTarget = null)}
+        />
     {/if}
 </div>

@@ -5,6 +5,7 @@
     import { dndzone, type DndEvent } from "svelte-dnd-action";
     import { flip } from "svelte/animate";
     import type { Card } from "../lib/types";
+    import { Eye, EyeOff } from "lucide-svelte";
 
     const flipDurationMs = 300;
 
@@ -13,6 +14,7 @@
     let isDragging = false;
     let pendingServerUpdate: Card[] | null = null;
     let pinnedForeignCards: Card[] = [];
+    let isPrivateView = false;
 
     // --- SYNC LOGIC (Update Buffering) ---
     // Reactive: Sync localBoard from store only if NOT dragging
@@ -87,7 +89,28 @@
     }
 </script>
 
-<div class="w-full max-w-5xl mx-auto mt-4 relative flex justify-center px-4">
+<div
+    class="w-full max-w-5xl mx-auto mt-4 relative flex flex-col items-center px-4"
+>
+    <!-- Controls -->
+    <div class="w-full flex justify-end mb-2">
+        <button
+            on:click={() => (isPrivateView = !isPrivateView)}
+            class="flex items-center gap-2 px-3 py-1.5 bg-white border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 active:shadow-none transition-all text-xs font-bold font-mono uppercase hover:bg-yellow-50"
+            title={isPrivateView
+                ? "Show my card numbers"
+                : "Hide my card numbers"}
+        >
+            {#if isPrivateView}
+                <EyeOff size={16} />
+                <span>Hidden</span>
+            {:else}
+                <Eye size={16} />
+                <span>Visible</span>
+            {/if}
+        </button>
+    </div>
+
     <!-- Active Drop Zone (The Board) -->
     <div
         class="w-full min-h-[400px] border-4 border-black border-dashed bg-white flex flex-wrap justify-center content-start gap-4 p-4 md:p-8 transition-colors shadow-[8px_8px_0px_0px_#000000] relative"
@@ -112,6 +135,7 @@
                 <CardComponent
                     {card}
                     hidden={!card.isFaceUp}
+                    forceHide={isPrivateView}
                     ownerName={$gameState.players.find(
                         (p) => p.id === card.playerId,
                     )?.name}
