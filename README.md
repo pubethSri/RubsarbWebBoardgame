@@ -1,6 +1,6 @@
-# Rubsarb 🃏
+# Ito 🃏
 
-**Rubsarb** is a real-time cooperative web board game where players must sync their minds to sort numbers without speaking them.
+**Ito** is a real-time cooperative web board game where players must sync their minds to sort numbers without speaking them.
 
 Built with **Bun**, **Elysia.js**, and **Svelte**, styled with a strict **Monochrome** aesthetic.
 
@@ -24,8 +24,8 @@ The default `docker-compose.yml` includes an **Nginx** reverse proxy listening o
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/your-username/rubsarb.git
-cd rubsarb
+git clone https://github.com/your-username/ito.git
+cd ito
 
 # 2. Setup Environment Variables
 cp .env.example .env

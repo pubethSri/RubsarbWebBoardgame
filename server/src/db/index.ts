@@ -5,7 +5,7 @@ import { mkdirSync } from "fs";
 try { mkdirSync("db"); } catch (e) { }
 
 // persistent sqlite database
-const db = new Database("db/rubsarb.sqlite", { create: true });
+const db = new Database("db/game.sqlite", { create: true });
 
 // Optimize for concurrency and data integrity
 db.query("PRAGMA journal_mode = WAL;").run();

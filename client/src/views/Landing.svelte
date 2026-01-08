@@ -97,8 +97,7 @@
             <h1
                 class="text-6xl md:text-8xl font-black font-mono tracking-tighter whitespace-nowrap animate-marquee"
             >
-                RUBSARB · BOARDGAME · RUBSARB · BOARDGAME · RUBSARB · BOARDGAME
-                ·
+                ITO · BOARDGAME · ITO · BOARDGAME · ITO · BOARDGAME
             </h1>
         </div>
 

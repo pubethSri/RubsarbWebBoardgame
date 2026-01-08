@@ -495,5 +495,5 @@ const app = new Elysia()
     });
 
 console.log(
-    `🦊 Rubsarb Server is running at ${app.server?.hostname}:${app.server?.port}`
+    `🦊 Ito Server is running at ${app.server?.hostname}:${app.server?.port}`
 );
