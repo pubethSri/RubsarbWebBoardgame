@@ -150,32 +150,128 @@
     </div>
 
     <!-- Actions -->
-    <div class="flex flex-col gap-4 mt-8 w-72 z-10">
-        <Button
-            size="lg"
-            fullWidth
-            variant={result === "WIN" ? "primary" : "secondary"}
-            onclick={playerCount < 2 ? leaveRoom : sendReady}
-            disabled={isReady && playerCount >= 2}
-            class={result === "LOSS" ? "shadow-[4px_4px_0px_0px_#fff]" : ""}
-        >
-            {#if playerCount < 2}
-                EXIT
-            {:else if isReady}
-                WAITING... ({readyCount}/{playerCount})
-            {:else if result === "WIN"}
-                NEXT LEVEL →
-            {:else}
-                RETRY
+    <div class="flex flex-col items-center gap-6 w-full max-w-2xl z-10 mt-8">
+        {#if playerCount < 2}
+            <div class="w-72">
+                <Button
+                    size="lg"
+                    fullWidth
+                    variant="secondary"
+                    onclick={leaveRoom}
+                >
+                    EXIT
+                </Button>
+            </div>
+        {:else if result === "WIN"}
+            {@const myId = $gameState.playerId || ""}
+            {@const myVote = $gameState.votes[myId]}
+            {@const hasVoted = !!myVote}
+
+            <div class="flex flex-row gap-8 w-full justify-center">
+                <!-- RETRY SECTION -->
+                <div class="flex flex-col gap-2 flex-1 max-w-xs">
+                    <Button
+                        size="lg"
+                        fullWidth
+                        variant="secondary"
+                        onclick={() =>
+                            socketStore.sendMessage({
+                                type: "VOTE",
+                                payload: { vote: "RETRY" },
+                            })}
+                        class={myVote === "RETRY"
+                            ? "ring-4 ring-black ring-offset-2 scale-105"
+                            : hasVoted
+                              ? "opacity-50 hover:opacity-100 transition-opacity"
+                              : ""}
+                    >
+                        RETRY LEVEL {level}
+                    </Button>
+
+                    <!-- Voter Avatars -->
+                    <div
+                        class="flex flex-wrap gap-2 min-h-[2rem] p-2 bg-black/20 rounded-lg border-2 border-black/10"
+                    >
+                        {#each $gameState.players.filter((p) => $gameState.votes[p.id] === "RETRY") as p}
+                            <div
+                                class="w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-[10px] font-bold text-white overflow-hidden relative"
+                                style="background-color: {p.color}"
+                                title={p.name}
+                            >
+                                {p.name.slice(0, 2).toUpperCase()}
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+
+                <!-- NEXT SECTION -->
+                <div class="flex flex-col gap-2 flex-1 max-w-xs">
+                    <Button
+                        size="lg"
+                        fullWidth
+                        variant="primary"
+                        onclick={() =>
+                            socketStore.sendMessage({
+                                type: "VOTE",
+                                payload: { vote: "NEXT" },
+                            })}
+                        class={myVote === "NEXT"
+                            ? "ring-4 ring-black ring-offset-2 scale-105"
+                            : hasVoted
+                              ? "opacity-50 hover:opacity-100 transition-opacity"
+                              : ""}
+                    >
+                        NEXT LEVEL {level + 1}
+                    </Button>
+
+                    <!-- Voter Avatars -->
+                    <div
+                        class="flex flex-wrap gap-2 min-h-[2rem] p-2 bg-black/20 rounded-lg border-2 border-black/10"
+                    >
+                        {#each $gameState.players.filter((p) => $gameState.votes[p.id] === "NEXT") as p}
+                            <div
+                                class="w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-[10px] font-bold text-white overflow-hidden relative"
+                                style="background-color: {p.color}"
+                                title={p.name}
+                            >
+                                {p.name.slice(0, 2).toUpperCase()}
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+            </div>
+
+            {#if hasVoted}
+                <div
+                    class="text-black font-bold font-mono bg-white px-4 py-2 border-2 border-black animate-pulse"
+                >
+                    WAITING FOR OTHERS...
+                </div>
             {/if}
-        </Button>
+        {:else}
+            <!-- LOSS: Simple Ready to Retry -->
+            <div class="w-full max-w-sm flex flex-col gap-4">
+                <Button
+                    size="lg"
+                    fullWidth
+                    variant="secondary"
+                    onclick={sendReady}
+                    disabled={isReady}
+                >
+                    {#if isReady}
+                        WAITING... ({readyCount}/{playerCount})
+                    {:else}
+                        RETRY LEVEL {level}
+                    {/if}
+                </Button>
+            </div>
+        {/if}
 
         <Button
             variant="ghost"
-            fullWidth
             class={result === "LOSS"
-                ? "text-white hover:bg-white/10 hover:border-white border-white"
-                : ""}
+                ? "text-white hover:bg-white/10 hover:border-white border-white w-48"
+                : "w-48"}
             onclick={leaveRoom}
         >
             LEAVE ROOM

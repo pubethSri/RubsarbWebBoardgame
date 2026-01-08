@@ -7,6 +7,7 @@
     import Admin from "./Admin.svelte";
     import LoginModal from "../components/LoginModal.svelte";
     import HowToPlayModal from "../components/HowToPlayModal.svelte";
+    import WhatsNewModal from "../components/WhatsNewModal.svelte"; // Added
     import Button from "../components/UI/Button.svelte";
     import { authStore, logout } from "../lib/stores/auth";
     import { HelpCircle, Star, Zap, Trash2 } from "lucide-svelte";
@@ -21,6 +22,11 @@
     let viewMode = $state<"HOME" | "JOIN" | "CREATE_PACK" | "ADMIN">("HOME");
     let showLogin = $state(false);
     let showHowToPlay = $state(false);
+
+    // Added for WhatsNewModal
+    let showPatchNotes = $state(false);
+    let hasUnreadNotes = $state(false);
+    const CURRENT_VERSION = "1.2";
 
     // Showcase Animation State
     let demoColorIndex = $state(0);
@@ -53,11 +59,23 @@
                 cursorY = 20;
             }
         }, 1000);
+
+        // WhatsNewModal logic
+        const seenVersion = localStorage.getItem("seen_patch_version");
+        if (seenVersion !== CURRENT_VERSION) {
+            hasUnreadNotes = true;
+        }
     });
 
     onDestroy(() => {
         if (animationInterval) clearInterval(animationInterval);
     });
+
+    function handlePatchNotesClose() {
+        showPatchNotes = false;
+        hasUnreadNotes = false;
+        localStorage.setItem("seen_patch_version", CURRENT_VERSION);
+    }
 
     function createRoom() {
         if (!playerName.trim()) return;
@@ -75,6 +93,8 @@
         });
     }
 </script>
+
+<WhatsNewModal isOpen={showPatchNotes} onClose={handlePatchNotesClose} />
 
 {#if viewMode === "CREATE_PACK"}
     <CreatePack onBack={() => (viewMode = "HOME")} />
@@ -108,12 +128,21 @@
             <div
                 class="w-full max-w-lg bg-white border-4 border-black shadow-[8px_8px_0px_0px_#000000] p-8 relative"
             >
-                <!-- Decorative Badge -->
-                <div
-                    class="absolute -top-6 -right-6 bg-primary-blue text-white p-3 border-4 border-black shadow-[4px_4px_0px_0px_#000000] rotate-12 z-20"
+                <!-- Patch Notes Trigger (Blue Star) -->
+                <button
+                    class="absolute -top-6 -right-6 bg-primary-blue text-white p-3 border-4 border-black shadow-[4px_4px_0px_0px_#000000] rotate-12 z-20 hover:scale-110 hover:rotate-6 transition-transform cursor-pointer group"
+                    onclick={() => (showPatchNotes = true)}
+                    aria-label="What's New"
                 >
-                    <Star class="fill-current w-8 h-8" />
-                </div>
+                    {#if hasUnreadNotes}
+                        <span
+                            class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-primary-red border-2 border-black animate-pulse z-30"
+                        ></span>
+                    {/if}
+                    <Star
+                        class="fill-current w-8 h-8 group-hover:animate-spin-slow"
+                    />
+                </button>
 
                 <!-- Input Section -->
                 <div class="mb-8 space-y-4">

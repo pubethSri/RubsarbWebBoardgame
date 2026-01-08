@@ -19,6 +19,7 @@ export class Room {
     public activePackId: string = "starter_pack";
     public activePackName: string = "The Essentials";
     public roundResult: 'WIN' | 'LOSS' | null = null;
+    public votes: Map<string, 'RETRY' | 'NEXT'> = new Map();
     private usedTopicIds: Set<string> = new Set();
 
     constructor(code: string) {
@@ -38,6 +39,8 @@ export class Room {
             ? availableColors[Math.floor(Math.random() * availableColors.length)]
             : PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]!;
 
+        const finalColor = color || PLAYER_COLORS[0]!;
+
         const isHost = this.players.length === 0;
         const token = crypto.randomUUID();
         const player: Player = {
@@ -47,7 +50,7 @@ export class Room {
             ws,
             token,
             isConnected: true,
-            color
+            color: finalColor
         };
         this.players.push(player);
         return player;
@@ -69,6 +72,10 @@ export class Room {
 
         this.broadcast({ type: 'PLAYER_DC', payload: { playerId: id } });
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+
+        if (this.gameState === 'ROUND_END') {
+            this.checkVoteCompletion();
+        }
     }
 
     reconnectPlayer(token: string, ws: any): Player | null {
@@ -98,10 +105,21 @@ export class Room {
             clearTimeout(player.disconnectTimeout);
         }
 
+        // If removed player had a vote, should we keep it? 
+        // User request: "checks and proceed with the majority".
+        // This implies we re-evaluate immediately.
+        // It's safer to remove their vote so they don't count towards the total.
+        this.votes.delete(id);
+
         this.players = this.players.filter(p => p.id !== id);
         if (this.players.length > 0 && !this.players.some(p => p.isHost)) {
             // Assign new host if host left
             this.players[0]!.isHost = true;
+        }
+
+        // Check if this removal triggers vote completion
+        if (this.gameState === 'ROUND_END') {
+            this.checkVoteCompletion();
         }
     }
 
@@ -166,6 +184,7 @@ export class Room {
         this.version = 0; // Reset version on game start
         this.board = []; // Reset board
         this.readyPlayers.clear();
+        this.votes.clear(); // Reset voting
         this.roundResult = null; // Reset result
 
         // Shuffle
@@ -253,6 +272,80 @@ export class Room {
         });
     }
 
+    checkVoteCompletion() {
+        // Check if ALL active players have voted
+        const activePlayers = this.players.filter(p => p.isConnected);
+
+        let validVoteCount = 0;
+        this.votes.forEach((_, pid) => {
+            const p = this.players.find(pl => pl.id === pid);
+            if (p && p.isConnected) validVoteCount++;
+        });
+
+        // If everyone active has voted (and there is at least one player), resolve.
+        if (activePlayers.length > 0 && validVoteCount >= activePlayers.length) {
+            this.resolveVotes();
+        }
+    }
+
+    handleVote(playerId: string, vote: 'RETRY' | 'NEXT') {
+        // Only accept votes in ROUND_END state
+        if (this.gameState !== 'ROUND_END') return;
+
+        this.votes.set(playerId, vote);
+
+        // Notify clients of update immediately
+        this.broadcast({
+            type: 'VOTE_UPDATED',
+            payload: { votes: Object.fromEntries(this.votes) }
+        });
+
+        this.checkVoteCompletion();
+    }
+
+    resolveVotes() {
+        let nextCount = 0;
+        let retryCount = 0;
+        const hostId = this.players.find(p => p.isHost)?.id;
+
+        // Count only active players' votes
+        for (const player of this.players) {
+            if (!player.isConnected) continue;
+            const v = this.votes.get(player.id);
+            if (v === 'NEXT') nextCount++;
+            if (v === 'RETRY') retryCount++;
+        }
+
+        console.log(`[Room ${this.code}] Voting Result: NEXT=${nextCount}, RETRY=${retryCount}`);
+
+        let decision: 'NEXT' | 'RETRY' = 'RETRY'; // Default
+
+        if (nextCount > retryCount) {
+            decision = 'NEXT';
+        } else if (retryCount > nextCount) {
+            decision = 'RETRY';
+        } else {
+            // TIE -> Host decides
+            const hostVote = hostId ? this.votes.get(hostId) : null;
+            if (hostVote) {
+                console.log(`[Room ${this.code}] Vote Tie! Host (${hostId}) decides: ${hostVote}`);
+                decision = hostVote;
+            } else {
+                // Host missing or didn't vote? Default to Retry
+                console.warn(`[Room ${this.code}] Vote Tie but Host vote missing. Defaulting to RETRY.`);
+                decision = 'RETRY';
+            }
+        }
+
+        if (decision === 'NEXT') {
+            this.level++;
+        }
+        // if RETRY, level stays same
+
+        // Start Game
+        this.startGame();
+    }
+
     // New Atomic Move Logic
     moveCard(cardId: string, targetIndex: number) {
         // 1. Find the card in the current board
@@ -302,7 +395,11 @@ export class Room {
         }
 
         const card = this.board[index];
-        // @ts-ignore
+        if (!card) {
+            console.warn(`Card ${cardId} not found at index ${index}`);
+            return;
+        }
+
         if (card.isFaceUp) {
             console.warn(`Cannot return revealed card ${cardId}`);
             return;
@@ -362,11 +459,11 @@ export class Room {
         this.version++; // Even full overwrites bump version
         // ... (rest of updateBoard logic)
 
-        newBoard.forEach(card => {
+        newBoard.forEach((card: Card) => {
             // ... (hand syncing logic)
             const playerHand = this.hands.get(card.playerId);
             if (playerHand) {
-                const cardIndex = playerHand.findIndex(c => c.id === card.id);
+                const cardIndex = playerHand.findIndex((c) => c.id === card.id);
                 if (cardIndex !== -1) {
                     playerHand.splice(cardIndex, 1);
                 }
@@ -384,19 +481,20 @@ export class Room {
 
         if (nextHiddenIndex !== -1) {
             const card = this.board[nextHiddenIndex];
-            // @ts-ignore
+            if (!card) return;
+
             card.isFaceUp = true;
             this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
 
             // Logic: Check if Ascending
             if (nextHiddenIndex > 0) {
                 const prevCard = this.board[nextHiddenIndex - 1];
-                // @ts-ignore
-                if (card.value < prevCard.value) {
+                if (prevCard && card.value < prevCard.value) {
                     console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
                     console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
                     this.gameState = 'ROUND_END';
                     this.roundResult = 'LOSS';
+                    this.votes.clear(); // Clear old votes just in case
                     // Reveal ALL remaining cards
                     this.board.forEach(c => c.isFaceUp = true);
 
@@ -419,7 +517,9 @@ export class Room {
                     console.log("✅ SUCCESS: All cards revealed in ascending order!");
                     this.gameState = 'ROUND_END';
                     this.roundResult = 'WIN';
-                    this.level++; // Increment Level
+                    this.votes.clear(); // Clear old votes just in case
+                    // this.level++; // Incremented now only after Voting!
+                    // REMOVED: this.level++;
 
                     this.broadcast({
                         type: 'ROUND_ENDED',
@@ -472,7 +572,8 @@ export class Room {
             readyCount: this.readyPlayers.size,
             activePackName: this.activePackName,
             activePackId: this.activePackId,
-            roundResult: this.roundResult || undefined
+            roundResult: this.roundResult || undefined,
+            votes: Object.fromEntries(this.votes)
         };
     }
 }

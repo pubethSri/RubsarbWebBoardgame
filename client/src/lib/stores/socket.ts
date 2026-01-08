@@ -80,6 +80,9 @@ export const socketStore = {
                         gameState.leaveRoom();
                         if (socket) socket.close();
                         break;
+                    case 'VOTE_UPDATED':
+                        gameState.updateVotes(msg.payload.votes);
+                        break;
                 }
             } catch (e) {
                 console.error("Error parsing message", e);

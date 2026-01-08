@@ -200,6 +200,16 @@ const app = new Elysia()
                 }
             }
 
+            if (msg.type === 'VOTE') {
+                const session = activeSessions.get(ws.id);
+                if (session) {
+                    const room = roomManager.getRoom(session.roomId);
+                    if (room) {
+                        room.handleVote(session.playerId, msg.payload.vote);
+                    }
+                }
+            }
+
             if (msg.type === 'RECONNECT') {
                 const room = roomManager.getRoom(msg.payload.roomId);
                 if (room) {

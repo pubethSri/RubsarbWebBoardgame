@@ -17,7 +17,8 @@ const initialState: GameStore = {
     level: 1,
     roundResult: null,
     readyCount: 0,
-    lastRoundLevel: 1
+    lastRoundLevel: 1,
+    votes: {}
 };
 
 function createGameState() {
@@ -39,13 +40,15 @@ function createGameState() {
                 readyCount: state.readyCount,
                 activePackName: state.activePackName,
                 activePackId: state.activePackId,
-                roundResult: state.roundResult || s.roundResult
+                roundResult: state.roundResult || s.roundResult,
+                votes: state.votes || {}
             })),
         startGame: (hand: Card[], board: Card[]) => update(s => ({ ...s, gameState: 'PLAYING', hand, board, roundResult: null })),
         setHand: (hand: Card[]) => update(s => ({ ...s, hand })),
         setBoard: (board: Card[]) => update(s => ({ ...s, board })),
         setError: (error: string) => update(s => ({ ...s, error })),
-        setRoundResult: (result: 'WIN' | 'LOSS', board: Card[]) => update(s => ({ ...s, gameState: 'ROUND_END', roundResult: result, board, lastRoundLevel: s.level })),
+        setRoundResult: (result: 'WIN' | 'LOSS', board: Card[]) => update(s => ({ ...s, gameState: 'ROUND_END', roundResult: result, board, lastRoundLevel: s.level, votes: {} })),
+        updateVotes: (votes: Record<string, 'RETRY' | 'NEXT'>) => update(s => ({ ...s, votes })),
         setFullState: (state: RoomState, hand: Card[], playerId: string) => update(s => ({
             ...s,
             players: state.players,
@@ -58,7 +61,8 @@ function createGameState() {
             roomCode: state.code,
             playerId: playerId,
             isConnected: true,
-            roundResult: state.roundResult || null
+            roundResult: state.roundResult || null,
+            votes: state.votes || {}
         })),
         reset: () => set(initialState)
     };

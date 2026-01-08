@@ -47,9 +47,10 @@ export interface RoomState {
     version: number;
     level: number;
     readyCount: number;
-    activePackName?: string;
-    activePackId?: string;
+    activePackId: string;
+    activePackName: string;
     roundResult?: 'WIN' | 'LOSS';
+    votes: Record<string, 'RETRY' | 'NEXT'>;
 }
 
 export type WsMessage =
@@ -66,7 +67,8 @@ export type WsMessage =
     | { type: 'PLAYER_READY'; payload: null }
     | { type: 'RECONNECT'; payload: { token: string; roomId: string } }
     | { type: 'CHANGE_COLOR'; payload: { color: string } }
-    | { type: 'KICK_PLAYER'; payload: { playerId: string } };
+    | { type: 'KICK_PLAYER'; payload: { playerId: string } }
+    | { type: 'VOTE', payload: { vote: 'RETRY' | 'NEXT' } };
 
 export type WsResponse =
     | { type: 'ROOM_UPDATED'; payload: RoomState }
@@ -78,4 +80,5 @@ export type WsResponse =
     | { type: 'PLAYER_DC'; payload: { playerId: string } }
     | { type: 'PLAYER_RECONNECTED'; payload: { playerId: string } }
     | { type: 'PLAYER_KICKED'; payload: { playerId: string } }
-    | { type: 'KICKED'; payload: null };
+    | { type: 'KICKED'; payload: null }
+    | { type: 'VOTE_UPDATED', payload: { votes: Record<string, 'RETRY' | 'NEXT'> } };
