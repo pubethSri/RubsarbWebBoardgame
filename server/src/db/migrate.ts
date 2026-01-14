@@ -4,13 +4,13 @@ import { join } from "path";
 
 export async function migrate() {
     // Check if database is already populated
-    const check = db.query("SELECT count(*) as count FROM packs").get() as { count: number };
-    if (check.count > 0) {
-        console.log("Database already populated. Skipping migration.");
-        return;
-    }
+    // const check = db.query("SELECT count(*) as count FROM packs").get() as { count: number };
+    // if (check.count > 0) {
+    //     console.log("Database already populated. Skipping migration.");
+    //     return;
+    // }
 
-    console.log("Starting migration from topics.yaml...");
+    console.log("Starting migration (Incremental)...");
 
     try {
         const yamlPath = join(import.meta.dir, "../topics.yaml");
@@ -19,7 +19,7 @@ export async function migrate() {
         const data = parse(content) as { packs: any[] };
 
         const insertPack = db.prepare(`
-            INSERT INTO packs (id, name, author, is_official)
+            INSERT OR IGNORE INTO packs (id, name, author, is_official)
             VALUES ($id, $name, $author, $is_official)
         `);
 
@@ -36,6 +36,18 @@ export async function migrate() {
                     $author: "System",
                     $is_official: 1
                 });
+
+                // Ensure share_code exists
+                const existing = db.query("SELECT share_code FROM packs WHERE id = $id").get({ $id: pack.id }) as any;
+                if (existing && !existing.share_code) {
+                    // Generate code
+                    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    db.query("UPDATE packs SET share_code = $code WHERE id = $id").run({ $code: code, $id: pack.id });
+                    console.log(`Updated share code for ${pack.name}: ${code}`);
+                }
+
+                // Clear existing topics for this system pack to avoid duplicates during re-seed
+                db.query("DELETE FROM topics WHERE pack_id = $pack_id").run({ $pack_id: pack.id });
 
                 for (const topic of pack.topics) {
                     insertTopic.run({

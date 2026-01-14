@@ -3,6 +3,7 @@ import { RoomManager } from './RoomManager';
 import type { WsMessage } from './types';
 import { db, initDB } from './db';
 import { migrate } from './db/migrate';
+import { seedUsers } from './db/seed_users';
 import { rateLimit } from './middleware/rateLimit';
 // import { adminAuth } from './middleware/adminAuth';
 // import { creatorAuth } from './middleware/creatorAuth';
@@ -13,6 +14,7 @@ import { CreatePackSchema } from './schemas/topic';
 // Initialize Database & Run Migrations
 initDB();
 await migrate();
+await seedUsers();
 
 const roomManager = new RoomManager();
 
@@ -303,6 +305,17 @@ const app = new Elysia()
             return { username: user.username, role: user.role };
         })
     )
+    .get("/api/packs/official", ({ set }) => {
+        try {
+            const results = db.query(`
+                SELECT * FROM packs WHERE is_official = 1
+            `).all();
+            return results;
+        } catch (e) {
+            set.status = 500;
+            return "Database Error";
+        }
+    })
     .post("/api/packs", ({ body, set, user }: any) => {
         // Role Check
         if (user.role !== 'CREATOR' && user.role !== 'ADMIN') {
@@ -399,9 +412,25 @@ const app = new Elysia()
                 // Double check admin role
                 // @ts-ignore
                 const user = AuthUtils.getUserByToken(request.headers.get("x-auth-token"));
-                if (!user || user.role !== 'ADMIN') {
+                if (!user || (user.role !== 'ADMIN' && user.role !== 'CREATOR')) {
                     set.status = 403;
-                    return "Admins only";
+                    return "Admins or Creators only";
+                }
+            })
+            .get("/stats", ({ set }) => {
+                return roomManager.getStats();
+            })
+            .get("/history", ({ set }) => {
+                try {
+                    const logs = db.query(`
+                        SELECT * FROM game_logs
+                        ORDER BY created_at DESC
+                        LIMIT 100
+                    `).all();
+                    return logs;
+                } catch (e) {
+                    set.status = 500;
+                    return "Database Error";
                 }
             })
             .get("/packs", ({ set }) => {

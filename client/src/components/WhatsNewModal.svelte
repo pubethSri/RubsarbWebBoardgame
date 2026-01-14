@@ -5,9 +5,18 @@
     export let isOpen = false;
     export let onClose: () => void;
 
-    const CURRENT_VERSION = "1.2"; // Bumped for Voting System
+    const CURRENT_VERSION = "1.3"; // Bumped for Pack Selection
 
     const PATCH_NOTES = [
+        {
+            version: "1.3",
+            date: "2025-01-25",
+            title: "Content Update",
+            features: [
+                "📚 <b>Pack Selection:</b> Hosts can now browse and select Official Packs directly in the lobby!",
+                "✨ <b>Lobby Upgrade:</b> Improved UI for managing game settings.",
+            ],
+        },
         {
             version: "1.2",
             date: "2025-01-20",

@@ -1,5 +1,6 @@
 import { type Player, type RoomState, type GameStatus, type Card, type WsResponse, type Topic, PLAYER_COLORS } from './types';
 import { TopicManager } from './TopicManager';
+import { db } from './db'; // Added db import
 
 const topicManager = new TopicManager();
 
@@ -7,6 +8,7 @@ const MAX_PLAYERS = 10;
 
 export class Room {
     public code: string;
+    public sessionId: string;
     public players: Player[] = [];
     public gameState: GameStatus = 'LOBBY';
     public board: Card[] = [];
@@ -24,6 +26,7 @@ export class Room {
 
     constructor(code: string) {
         this.code = code;
+        this.sessionId = crypto.randomUUID();
     }
 
     addPlayer(id: string, name: string, ws: any): Player {
@@ -425,52 +428,24 @@ export class Room {
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
 
-    updateNote(cardId: string, note: string) {
-        // 1. Try to find in Board
-        const boardCard = this.board.find(c => c.id === cardId);
-        if (boardCard) {
-            boardCard.note = note;
-            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
-            return;
+    private logResult(result: 'WIN' | 'LOSS') {
+        try {
+            const playersSnapshot = JSON.stringify(this.players.map(p => p.name));
+            db.query(`
+                INSERT INTO game_logs (id, room_code, session_id, pack_name, level, result, players_snapshot)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                crypto.randomUUID(),
+                this.code,
+                this.sessionId,
+                this.activePackName,
+                this.level,
+                result,
+                playersSnapshot
+            );
+        } catch (e) {
+            console.error("Failed to log game result:", e);
         }
-
-        // 2. Try to find in Hands
-        for (const [playerId, hand] of this.hands.entries()) {
-            const handCard = hand.find(c => c.id === cardId);
-            if (handCard) {
-                handCard.note = note;
-                // Resend GAME_STARTED to update private hands
-                const player = this.players.find(p => p.id === playerId);
-                if (player && player.ws) {
-                    player.ws.send(JSON.stringify({
-                        type: 'GAME_STARTED',
-                        payload: { hand, board: this.board }
-                    }));
-                }
-                return;
-            }
-        }
-    }
-
-    updateBoard(newBoard: Card[]) {
-        // Fallback or Deprecated? 
-        // For now, let's keep it but ideally we switch to moveCard everywhere.
-        this.board = newBoard;
-        this.version++; // Even full overwrites bump version
-        // ... (rest of updateBoard logic)
-
-        newBoard.forEach((card: Card) => {
-            // ... (hand syncing logic)
-            const playerHand = this.hands.get(card.playerId);
-            if (playerHand) {
-                const cardIndex = playerHand.findIndex((c) => c.id === card.id);
-                if (cardIndex !== -1) {
-                    playerHand.splice(cardIndex, 1);
-                }
-            }
-        });
-
-        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
 
     revealNext() {
@@ -491,9 +466,9 @@ export class Room {
                 const prevCard = this.board[nextHiddenIndex - 1];
                 if (prevCard && card.value < prevCard.value) {
                     console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
-                    console.log(`❌ FAIL: Order broken! ${card.value} < ${prevCard.value}`);
                     this.gameState = 'ROUND_END';
                     this.roundResult = 'LOSS';
+                    this.logResult('LOSS');
                     this.votes.clear(); // Clear old votes just in case
                     // Reveal ALL remaining cards
                     this.board.forEach(c => c.isFaceUp = true);
@@ -517,6 +492,7 @@ export class Room {
                     console.log("✅ SUCCESS: All cards revealed in ascending order!");
                     this.gameState = 'ROUND_END';
                     this.roundResult = 'WIN';
+                    this.logResult('WIN');
                     this.votes.clear(); // Clear old votes just in case
                     // this.level++; // Incremented now only after Voting!
                     // REMOVED: this.level++;
@@ -537,16 +513,9 @@ export class Room {
         // Validate color
         if (!PLAYER_COLORS.includes(newColor)) return;
 
-        // Check if taken (optional? User said "not the same as the one others already have")
-        // But if they manually switch, maybe we enforce uniqueness too?
-        // User request: "they can click or their icon to change the color if they want"
-        // Implicitly implies availability check.
+        // Check if taken
         const isTaken = this.players.some(p => p.color === newColor && p.id !== playerId);
         if (isTaken) {
-            // If taken, maybe pick another random one? or do nothing?
-            // Let's just do nothing for now, client should handle UI to disable used colors maybe?
-            // Or server can rotate to next available?
-            // Let's simplify: Force uniqueness. If requested is taken, ignore.
             return;
         }
 

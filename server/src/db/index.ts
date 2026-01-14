@@ -34,7 +34,6 @@ export function initDB() {
             max_label TEXT,
             FOREIGN KEY(pack_id) REFERENCES packs(id) ON DELETE CASCADE
         );
-        );
     `).run();
 
     db.query(`
@@ -44,6 +43,19 @@ export function initDB() {
             password TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'USER',
             token TEXT,
+            created_at INTEGER DEFAULT (unixepoch())
+        );
+    `).run();
+
+    db.query(`
+        CREATE TABLE IF NOT EXISTS game_logs (
+            id TEXT PRIMARY KEY,
+            room_code TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            pack_name TEXT,
+            level INTEGER,
+            result TEXT,
+            players_snapshot TEXT,
             created_at INTEGER DEFAULT (unixepoch())
         );
     `).run();

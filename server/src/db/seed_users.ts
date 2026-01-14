@@ -1,14 +1,15 @@
 import { db, initDB } from "./index";
-import { database } from "bun:sqlite";
 
-async function seedUsers() {
+
+export async function seedUsers() {
     initDB(); // Ensure tables exist
     const adminPass = process.env.ADMIN_PASSWORD;
     const creatorPass = process.env.CREATOR_PASSWORD;
 
     if (!adminPass || !creatorPass) {
-        console.error("❌ Missing ADMIN_PASSWORD or CREATOR_PASSWORD in .env");
-        process.exit(1);
+        // Warn but don't crash in production if not intended
+        console.warn("⚠️  Skipping User Seeding: ADMIN_PASSWORD or CREATOR_PASSWORD missing.");
+        return;
     }
 
     const hashPassword = async (pwd: string) => await Bun.password.hash(pwd);
@@ -42,5 +43,3 @@ async function seedUsers() {
         console.error("❌ Failed to seed users:", error);
     }
 }
-
-seedUsers();

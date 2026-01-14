@@ -5,7 +5,15 @@
     import HostGuideModal from "../components/HostGuideModal.svelte";
     import Button from "../components/UI/Button.svelte";
     import ConfirmModal from "../components/ConfirmModal.svelte";
-    import { HelpCircle, Crown, User, Star, UserX } from "lucide-svelte";
+    import {
+        HelpCircle,
+        Crown,
+        User,
+        Star,
+        UserX,
+        ChevronLeft,
+        ChevronRight,
+    } from "lucide-svelte";
     import { PLAYER_COLORS } from "../lib/types";
 
     // No need for $state for store subscriptions in Svelte 5 if using auto-subscription in template
@@ -16,18 +24,33 @@
     let showHostGuide = $state(false);
     let isConfiguring = $state(false);
 
+    let officialPacks: any[] = $state([]);
+
     // Modal States
     let showLeaveConfirm = $state(false);
     let kickTarget: string | null = $state(null); // ID of player to kick
 
-    async function changePack() {
-        if (!packShareCode || packShareCode.length < 6) return;
+    import { onMount } from "svelte";
+
+    onMount(async () => {
+        try {
+            const res = await fetch("/api/packs/official");
+            if (res.ok) {
+                officialPacks = await res.json();
+            }
+        } catch (e) {
+            console.error("Failed to load official packs", e);
+        }
+    });
+
+    async function changePack(code: string = packShareCode) {
+        if (!code || code.length < 3) return;
         isChangingPack = true;
         try {
             const res = await fetch(`/api/rooms/${$gameState.roomCode}/pack`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ shareCode: packShareCode }),
+                body: JSON.stringify({ shareCode: code }),
             });
             const data = await res.json();
             if (res.ok) {
@@ -44,6 +67,33 @@
             alert("Network Error");
         } finally {
             isChangingPack = false;
+        }
+    }
+
+    function cyclePack(direction: "next" | "prev") {
+        if (!officialPacks || officialPacks.length === 0) return;
+
+        // Find current pack index
+        let currentIndex = officialPacks.findIndex(
+            (p) => p.id === $gameState.activePackId,
+        );
+
+        // If current pack wasn't found (maybe custom?), start at -1 so next is 0 (first pack)
+        // If prev, -1 wrap around to last.
+
+        let nextIndex;
+        if (direction === "next") {
+            nextIndex = currentIndex + 1;
+            if (nextIndex >= officialPacks.length) nextIndex = 0;
+        } else {
+            nextIndex = currentIndex - 1;
+            if (nextIndex < 0) nextIndex = officialPacks.length - 1;
+        }
+
+        // Just use changePack with the share code of the next pack
+        const nextPack = officialPacks[nextIndex];
+        if (nextPack) {
+            changePack(nextPack.share_code);
         }
     }
 </script>
@@ -103,14 +153,36 @@
             </div>
 
             <div class="flex flex-col items-center gap-4 text-center">
-                <div class="space-y-1">
+                <div class="space-y-1 w-full flex flex-col items-center">
                     <span class="brutal-text text-sm text-gray-500"
                         >Current Topic Pack</span
                     >
-                    <div
-                        class="text-2xl md:text-4xl font-black font-mono uppercase leading-tight max-w-lg"
-                    >
-                        {$gameState.activePackName || "The Essentials"}
+                    <div class="flex items-center justify-center gap-4 w-full">
+                        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
+                            <button
+                                onclick={() => cyclePack("prev")}
+                                disabled={isChangingPack}
+                                class="p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-30"
+                            >
+                                <ChevronLeft size={32} />
+                            </button>
+                        {/if}
+
+                        <div
+                            class="text-2xl md:text-4xl font-black font-mono uppercase leading-tight max-w-lg"
+                        >
+                            {$gameState.activePackName || "The Essentials"}
+                        </div>
+
+                        {#if $gameState.players.find((p) => p.id === $gameState.playerId)?.isHost}
+                            <button
+                                onclick={() => cyclePack("next")}
+                                disabled={isChangingPack}
+                                class="p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-30"
+                            >
+                                <ChevronRight size={32} />
+                            </button>
+                        {/if}
                     </div>
                 </div>
 
@@ -126,23 +198,39 @@
                     {#if isConfiguring}
                         <div
                             transition:slide
-                            class="w-full max-w-xs flex gap-2 pt-4 border-t-2 border-dashed border-gray-300"
+                            class="w-full max-w-sm flex flex-col gap-4 pt-4 border-t-2 border-dashed border-gray-300"
                         >
-                            <input
-                                bind:value={packShareCode}
-                                placeholder="PACK CODE..."
-                                class="flex-1 h-12 border-4 border-black px-3 font-mono text-center uppercase focus:bg-yellow-50 placeholder:text-gray-400"
-                                maxlength="6"
-                            />
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onclick={changePack}
-                                disabled={isChangingPack ||
-                                    packShareCode.length < 6}
+                            <!-- Official Packs List Removed (User Request) -->
+
+                            <!-- Custom Code -->
+
+                            <!-- Custom Code -->
+                            <div
+                                class="space-y-2 pt-2 border-t border-gray-200"
                             >
-                                {isChangingPack ? "..." : "LOAD"}
-                            </Button>
+                                <span
+                                    class="text-xs font-bold uppercase text-gray-400"
+                                    >Or Custom Code</span
+                                >
+                                <div class="flex gap-2">
+                                    <input
+                                        bind:value={packShareCode}
+                                        placeholder="CODE..."
+                                        class="flex-1 h-10 border-2 border-black px-3 font-mono text-center uppercase focus:bg-yellow-50 placeholder:text-gray-400"
+                                        maxlength="6"
+                                    />
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onclick={() =>
+                                            changePack(packShareCode)}
+                                        disabled={isChangingPack ||
+                                            packShareCode.length < 3}
+                                    >
+                                        LOAD
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     {/if}
                 {/if}

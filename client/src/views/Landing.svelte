@@ -4,7 +4,8 @@
     import { gameState } from "../lib/stores/gameState";
 
     import CreatePack from "./CreatePack.svelte";
-    import Admin from "./Admin.svelte";
+    import AdminDashboard from "./AdminDashboard.svelte";
+    import ManagePacks from "./ManagePacks.svelte"; // Added
     import LoginModal from "../components/LoginModal.svelte";
     import HowToPlayModal from "../components/HowToPlayModal.svelte";
     import WhatsNewModal from "../components/WhatsNewModal.svelte"; // Added
@@ -19,7 +20,9 @@
 
     let playerName = $state("");
     let roomCode = $state("");
-    let viewMode = $state<"HOME" | "JOIN" | "CREATE_PACK" | "ADMIN">("HOME");
+    let viewMode = $state<
+        "HOME" | "JOIN" | "CREATE_PACK" | "ADMIN" | "MANAGE_PACKS"
+    >("HOME");
     let showLogin = $state(false);
     let showHowToPlay = $state(false);
 
@@ -99,7 +102,9 @@
 {#if viewMode === "CREATE_PACK"}
     <CreatePack onBack={() => (viewMode = "HOME")} />
 {:else if viewMode === "ADMIN"}
-    <Admin onBack={() => (viewMode = "HOME")} />
+    <AdminDashboard onBack={() => (viewMode = "HOME")} />
+{:else if viewMode === "MANAGE_PACKS"}
+    <ManagePacks onBack={() => (viewMode = "HOME")} />
 {:else}
     <div
         class="min-h-screen bg-primary-yellow relative overflow-hidden flex flex-col"
@@ -303,10 +308,9 @@
             {/if}
         </div>
 
-        <!-- Admin Link -->
-        <!-- Admin Link (Moved to Left) -->
-        {#if $authStore?.role === "ADMIN"}
-            <div class="fixed bottom-4 left-4 z-50">
+        <!-- Admin / Creator Links -->
+        <div class="fixed bottom-4 left-4 z-50 flex flex-col gap-2 items-start">
+            {#if $authStore?.role === "ADMIN"}
                 <Button
                     variant="secondary"
                     size="sm"
@@ -314,8 +318,19 @@
                 >
                     ADMIN DASHBOARD
                 </Button>
-            </div>
-        {/if}
+            {/if}
+
+            {#if $authStore && ($authStore.role === "CREATOR" || $authStore.role === "ADMIN")}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onclick={() => (viewMode = "MANAGE_PACKS")}
+                    class="bg-white/80 backdrop-blur-sm border-2 border-black shadow-sm"
+                >
+                    MANAGE PACKS
+                </Button>
+            {/if}
+        </div>
 
         <!-- Color Change Showcase (Moved to Right) -->
         <div

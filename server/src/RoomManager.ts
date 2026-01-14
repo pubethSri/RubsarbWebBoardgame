@@ -31,4 +31,35 @@ export class RoomManager {
         }
         return result;
     }
+    getStats() {
+        let playerCount = 0;
+        let playingRooms = 0;
+
+        const activeRooms: any[] = [];
+
+        this.rooms.forEach(room => {
+            playerCount += room.players.length;
+            if (room.gameState === 'PLAYING') {
+                playingRooms++;
+            }
+            activeRooms.push({
+                code: room.code,
+                playerCount: room.players.length,
+                players: room.players.map(p => ({
+                    name: p.name,
+                    isHost: p.isHost,
+                    isConnected: p.isConnected
+                })),
+                gameState: room.gameState,
+                packName: room.activePackName
+            });
+        });
+
+        return {
+            roomCount: this.rooms.size,
+            playerCount,
+            playingRooms,
+            rooms: activeRooms
+        };
+    }
 }

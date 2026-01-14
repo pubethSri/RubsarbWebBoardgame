@@ -94,3 +94,31 @@ packs:
       - text: "Ways to travel in Bangkok"
         min_label: "Worst"
         max_label: "Best"
+
+  - id: "work_life"
+    name: "Office Politics"
+    description: "Navigate the treacherous waters of the corporate world."
+    topics:
+      - text: "Email sign-off"
+        min_label: "Passive Aggressive"
+        max_label: "Professional"
+      
+      - text: "Reason to call in sick"
+        min_label: "Unbelievable"
+        max_label: "Ironclad"
+
+      - text: "Coworker habit"
+        min_label: "Annoying"
+        max_label: "Endearing"
+
+      - text: "Meeting snack"
+        min_label: "Sad"
+        max_label: "Morale Boosting"
+
+      - text: "Team building activity"
+        min_label: "Torture"
+        max_label: "Fun"
+      
+      - text: "Zoom background"
+        min_label: "Distracting"
+        max_label: "Professional"
