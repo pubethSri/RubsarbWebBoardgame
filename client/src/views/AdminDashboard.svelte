@@ -9,7 +9,7 @@
         History,
     } from "lucide-svelte"; // Added History
     import { authStore, logout } from "../lib/stores/auth";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import ManagePacks from "./ManagePacks.svelte";
     import HistoryView from "./HistoryView.svelte";
 
@@ -18,6 +18,7 @@
     let currentView: "DASHBOARD" | "PACKS" | "HISTORY" = "DASHBOARD";
     let stats: any = null;
     let isLoading = true;
+    let pollingInterval: any;
 
     onMount(async () => {
         if (
@@ -27,13 +28,21 @@
             onBack();
             return;
         }
-        // Stats might be Admin only? Let's check API.
-        // But for now let's try to fetch stats, if it fails fine.
+        // Initial fetch
         await fetchStats();
+
+        // Setup Auto-Refresh every 1 minute
+        pollingInterval = setInterval(() => {
+            fetchStats(true); // silent refresh
+        }, 60 * 1000);
     });
 
-    async function fetchStats() {
-        isLoading = true;
+    onDestroy(() => {
+        if (pollingInterval) clearInterval(pollingInterval);
+    });
+
+    async function fetchStats(silent: boolean = false) {
+        if (!silent) isLoading = true;
         try {
             const res = await fetch("/api/admin/stats", {
                 headers: { "x-auth-token": $authStore?.token || "" },
@@ -44,7 +53,7 @@
         } catch (e) {
             console.error(e);
         } finally {
-            isLoading = false;
+            if (!silent) isLoading = false;
         }
     }
 
