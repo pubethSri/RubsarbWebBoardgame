@@ -23,10 +23,14 @@ export class Room {
     public roundResult: 'WIN' | 'LOSS' | null = null;
     public votes: Map<string, 'RETRY' | 'NEXT'> = new Map();
     private usedTopicIds: Set<string> = new Set();
+    private onEmpty?: () => void;
 
-    constructor(code: string) {
+
+
+    constructor(code: string, onEmpty?: () => void) {
         this.code = code;
         this.sessionId = crypto.randomUUID();
+        this.onEmpty = onEmpty;
     }
 
     addPlayer(id: string, name: string, ws: any): Player {
@@ -123,6 +127,10 @@ export class Room {
         // Check if this removal triggers vote completion
         if (this.gameState === 'ROUND_END') {
             this.checkVoteCompletion();
+        }
+
+        if (this.players.length === 0) {
+            this.onEmpty?.();
         }
     }
 

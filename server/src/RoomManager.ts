@@ -8,7 +8,9 @@ export class RoomManager {
         while (this.rooms.has(code)) {
             code = this.generateCode();
         }
-        const room = new Room(code);
+        const room = new Room(code, () => {
+            this.removeRoom(code);
+        });
         this.rooms.set(code, room);
         console.log(`🏠 Room created: ${code}`);
         return room;
