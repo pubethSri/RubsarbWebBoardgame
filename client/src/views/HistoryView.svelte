@@ -94,7 +94,9 @@
                                 Room: {session.roomCode}
                             </h3>
                             <p class="font-mono text-sm text-gray-500">
-                                Pack: {session.packName}
+                                Pack: {session.packName} • {new Date(
+                                    session.startedAt * 1000,
+                                ).toLocaleDateString()}
                             </p>
                         </div>
                         <!-- Show Players of last round -->
