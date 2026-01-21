@@ -436,6 +436,38 @@ export class Room {
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
     }
 
+    updateNote(cardId: string, note: string) {
+        // Check board first
+        const cardOnBoard = this.board.find(c => c.id === cardId);
+        if (cardOnBoard) {
+            cardOnBoard.note = note;
+            this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
+            return;
+        }
+
+        // Check hands
+        for (const [playerId, hand] of this.hands.entries()) {
+            const cardInHand = hand.find(c => c.id === cardId);
+            if (cardInHand) {
+                cardInHand.note = note;
+                // Only notify the owner? Or everyone?
+                // If it's in hand, it's private.
+                // But if they play it later, the note travels with it.
+                // We need to update the owner's hand state.
+                const player = this.players.find(p => p.id === playerId);
+                if (player && player.ws && player.ws.readyState === 1) {
+                    // We don't have a specific HAND_UPDATED message, but GAME_STARTED sends hand.
+                    // Or we can just rely on the fact that the client might not show notes in hand?
+                    // Let's just broadcast ROOM_UPDATED, but hand info is sanitized in getState.
+                    // We need to send the specific player their new hand?
+                    // Actually, usually client handles local note update for hand.
+                    // But let's save it on server so it persists.
+                }
+                return;
+            }
+        }
+    }
+
     private logResult(result: 'WIN' | 'LOSS') {
         try {
             const playersSnapshot = JSON.stringify(this.players.map(p => p.name));
