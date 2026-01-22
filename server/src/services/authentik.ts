@@ -18,6 +18,8 @@ export class AuthentikService {
 
         if (!this.clientId || !this.clientSecret || !this.issuer) {
             console.error("❌ Authentik credentials missing in .env");
+            console.error(`Client ID: ${!!this.clientId}, Secret: ${!!this.clientSecret}, Issuer: ${!!this.issuer}`);
+            throw new Error("Missing Authentik Environment Variables (OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, AUTHENTIK_ISSUER)");
         }
     }
 
