@@ -2,44 +2,11 @@ import { db, initDB } from "./index";
 
 
 export async function seedUsers() {
-    initDB(); // Ensure tables exist
-    const adminPass = process.env.ADMIN_PASSWORD;
-    const creatorPass = process.env.CREATOR_PASSWORD;
+    // Legacy Seeding Disabled for OIDC Migration
+    // We can't seed users without knowing their Authentik Subject ID (sub).
+    // Admin/Creator roles will be assigned via Authentik Groups (ito-admin, ito-creator).
+    // This file remains as a placeholder if we need to seed specific OIDC IDs later.
 
-    if (!adminPass || !creatorPass) {
-        // Warn but don't crash in production if not intended
-        console.warn("⚠️  Skipping User Seeding: ADMIN_PASSWORD or CREATOR_PASSWORD missing.");
-        return;
-    }
-
-    const hashPassword = async (pwd: string) => await Bun.password.hash(pwd);
-
-    const insertUser = db.prepare(`
-        INSERT INTO users (id, username, password, role)
-        VALUES ($id, $username, $password, $role)
-        ON CONFLICT(username) DO UPDATE SET password = $password
-    `);
-
-    try {
-        const adminHash = await hashPassword(adminPass);
-        insertUser.run({
-            $id: crypto.randomUUID(),
-            $username: "admin",
-            $password: adminHash,
-            $role: "ADMIN"
-        });
-        console.log("✅ User 'admin' seeded.");
-
-        const creatorHash = await hashPassword(creatorPass);
-        insertUser.run({
-            $id: crypto.randomUUID(),
-            $username: "creator",
-            $password: creatorHash,
-            $role: "CREATOR"
-        });
-        console.log("✅ User 'creator' seeded.");
-
-    } catch (error) {
-        console.error("❌ Failed to seed users:", error);
-    }
+    console.log("ℹ️  User Seeding Skipped (OIDC Mode Enabled)");
+    return;
 }

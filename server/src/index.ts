@@ -8,8 +8,11 @@ import { rateLimit } from './middleware/rateLimit';
 // import { adminAuth } from './middleware/adminAuth';
 // import { creatorAuth } from './middleware/creatorAuth';
 import { AuthUtils, authMiddleware } from './auth';
+import { AuthentikService } from './services/authentik';
 import { staticPlugin } from "@elysiajs/static";
 import { CreatePackSchema } from './schemas/topic';
+
+const authentikService = new AuthentikService();
 
 // Initialize Database & Run Migrations
 initDB();
@@ -273,29 +276,60 @@ const app = new Elysia()
     })
 
     .group("/api/auth", app => app
-        .post("/login", async ({ body, set }) => {
-            const { username, password } = body as any;
-            if (!username || !password) {
+        .get("/login/authentik", () => {
+            const url = authentikService.getAuthorizationUrl();
+            return Response.redirect(url);
+        })
+        .get("/callback/authentik", async ({ query, set }) => {
+            const code = query.code as string;
+            if (!code) {
                 set.status = 400;
-                return "Missing credentials";
+                return "No Authorization Code Provided";
             }
 
-            const user = db.query("SELECT * FROM users WHERE username = ?").get(username) as any;
-            if (!user) {
+            const accessToken = await authentikService.getToken(code);
+            if (!accessToken) {
                 set.status = 401;
-                return "Invalid credentials";
+                return "Failed to retrieve Access Token from Authentik";
             }
 
-            const isValid = await AuthUtils.verifyPassword(password, user.password);
-            if (!isValid) {
-                set.status = 401;
-                return "Invalid credentials";
+            const userInfo = await authentikService.getUserInfo(accessToken);
+            if (!userInfo) {
+                set.status = 500;
+                return "Failed to retrieve User Info from Authentik";
             }
 
+            // Map Roles
+            const role = authentikService.mapGroupsToRole(userInfo.groups);
+
+            // Generate Session Token
             const token = AuthUtils.createToken();
-            db.query("UPDATE users SET token = ? WHERE id = ?").run(token, user.id);
 
-            return { success: true, token, role: user.role, username: user.username };
+            // Upsert User
+            try {
+                const upsert = db.prepare(`
+                    INSERT INTO users (id, username, role, token) 
+                    VALUES ($id, $username, $role, $token)
+                    ON CONFLICT(id) DO UPDATE SET
+                        username = $username,
+                        role = $role,
+                        token = $token
+                `);
+
+                upsert.run({
+                    $id: userInfo.sub,
+                    $username: userInfo.preferred_username,
+                    $role: role,
+                    $token: token
+                });
+
+                // Redirect to Frontend with Token
+                return Response.redirect(`/?token=${token}`);
+            } catch (e) {
+                console.error("DB Error during login:", e);
+                set.status = 500;
+                return "Internal Database Error";
+            }
         })
         .get("/me", ({ request, set }) => {
             const token = request.headers.get("x-auth-token");

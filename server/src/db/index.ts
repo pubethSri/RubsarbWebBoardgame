@@ -36,13 +36,25 @@ export function initDB() {
         );
     `).run();
 
+    // Re-create users table for OIDC (Drop legacy password-based table)
+    try {
+        const userTableCheck = db.query("PRAGMA table_info(users)").all() as any[];
+        const hasPassword = userTableCheck.some(col => col.name === 'password');
+
+        if (hasPassword) {
+            console.log("♻️ Legacy user table detected. Dropping and recreating for OIDC...");
+            db.query("DROP TABLE users").run();
+        }
+    } catch (e) {
+        // Table might not exist, ignore
+    }
+
     db.query(`
         CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
+            id TEXT PRIMARY KEY, -- authentik 'sub'
             username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'USER',
-            token TEXT,
+            token TEXT, -- active session token
             created_at INTEGER DEFAULT (unixepoch())
         );
     `).run();

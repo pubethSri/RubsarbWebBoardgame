@@ -69,29 +69,26 @@
         {/if}
 
         <div class="flex flex-col gap-4">
-            <input
-                bind:value={username}
-                type="text"
-                placeholder="USERNAME"
-                class="h-12 border-4 border-black px-3 font-mono text-lg uppercase focus:bg-yellow-50 placeholder:text-gray-400"
-            />
-            <input
-                bind:value={password}
-                type="password"
-                placeholder="PASSWORD"
-                class="h-12 border-4 border-black px-3 font-mono text-lg placeholder:text-gray-400"
-                on:keydown={(e) => e.key === "Enter" && handleLogin()}
-            />
+            <p class="font-mono text-sm text-center text-gray-500 mb-2">
+                AUTHENTICATION REQUIRED
+            </p>
 
             <Button
                 variant="primary"
                 fullWidth
-                disabled={isLoading}
-                onclick={handleLogin}
-                class="mt-2"
+                size="lg"
+                onclick={() =>
+                    (window.location.href = "/api/auth/login/authentik")}
+                class="h-16 text-xl border-4"
             >
-                {isLoading ? "..." : "ENTER"}
+                LOGIN WITH AUTHENTIK
             </Button>
+
+            <div class="text-[10px] font-mono text-center text-gray-400 mt-2">
+                SECURED BY OIDC
+            </div>
+
+            <div class="border-t-2 border-black/10 my-2"></div>
 
             <Button
                 variant="ghost"
