@@ -38,7 +38,7 @@ export class AuthentikService {
             redirect_uri: this.redirectUri,
             response_type: "code",
             scope: "openid profile email groups",
-            prompt: "select_user",
+
         });
 
         const origin = new URL(this.issuer).origin;
@@ -48,7 +48,6 @@ export class AuthentikService {
     getLogoutUrl(idToken: string): string {
         const params = new URLSearchParams({
             id_token_hint: idToken,
-            prompt: "none",
             // After logout, Authentik should redirect back to home
             post_logout_redirect_uri: process.env.NODE_ENV === 'production'
                 ? 'https://ito.it.kmitl.ac.th/'
