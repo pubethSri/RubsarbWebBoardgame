@@ -1,9 +1,11 @@
+import * as jose from 'jose';
 
 export class AuthentikService {
     private clientId: string;
     private clientSecret: string;
     private issuer: string;
     private redirectUri: string;
+    private jwks: ReturnType<typeof jose.createRemoteJWKSet>;
 
     constructor() {
         this.clientId = process.env.OIDC_CLIENT_ID || "";
@@ -21,6 +23,13 @@ export class AuthentikService {
             console.error(`Client ID: ${!!this.clientId}, Secret: ${!!this.clientSecret}, Issuer: ${!!this.issuer}`);
             throw new Error("Missing Authentik Environment Variables (OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, AUTHENTIK_ISSUER)");
         }
+
+        // Initialize JWKS for signature verification
+        const origin = new URL(this.issuer).origin;
+        this.jwks = jose.createRemoteJWKSet(new URL(`${origin}/application/o/ito-app/jwks/`));
+        // Note: Generic JWKS URL usually implies looking up via .well-known/openid-configuration, 
+        // but for now we assume standard Authentik path or use issuer base. 
+        // User screenshot showed /application/o/ito-app/, so JWKS is likely at /application/o/ito-app/jwks/
     }
 
     getAuthorizationUrl(): string {
@@ -31,12 +40,24 @@ export class AuthentikService {
             scope: "openid profile email groups",
         });
 
-        // Based on user screenshot: use the origin + /application/o/authorize/
         const origin = new URL(this.issuer).origin;
         return `${origin}/application/o/authorize/?${params.toString()}`;
     }
 
-    async getToken(code: string): Promise<string | null> {
+    getLogoutUrl(idToken: string): string {
+        const params = new URLSearchParams({
+            id_token_hint: idToken,
+            // After logout, Authentik should redirect back to home
+            post_logout_redirect_uri: process.env.NODE_ENV === 'production'
+                ? 'https://ito.it.kmitl.ac.th/'
+                : `http://localhost:${process.env.PORT || 3000}/`
+        });
+
+        const origin = new URL(this.issuer).origin;
+        return `${origin}/application/o/ito-app/end-session/?${params.toString()}`;
+    }
+
+    async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {
         const params = new URLSearchParams({
             grant_type: "authorization_code",
             client_id: this.clientId,
@@ -46,11 +67,8 @@ export class AuthentikService {
         });
 
         try {
-            // Based on user screenshot: use the origin + /application/o/token/
             const origin = new URL(this.issuer).origin;
             const tokenUrl = `${origin}/application/o/token/`;
-
-            console.log("POSTing to Token URL:", tokenUrl);
 
             const res = await fetch(tokenUrl, {
                 method: "POST",
@@ -64,8 +82,11 @@ export class AuthentikService {
                 return null;
             }
 
-            const data = await res.json() as { access_token: string };
-            return data.access_token;
+            const data = await res.json() as { access_token: string, id_token?: string };
+            return {
+                access_token: data.access_token,
+                id_token: data.id_token
+            };
         } catch (e) {
             console.error("Network error during token exchange:", e);
             return null;
@@ -73,7 +94,6 @@ export class AuthentikService {
     }
 
     async getUserInfo(accessToken: string): Promise<{ sub: string, preferred_username: string, groups: string[] } | null> {
-        // Based on user screenshot: use the origin + /application/o/userinfo/
         const origin = new URL(this.issuer).origin;
         const infoUrl = `${origin}/application/o/userinfo/`;
 
@@ -100,9 +120,27 @@ export class AuthentikService {
     }
 
     mapGroupsToRole(groups: string[]): "ADMIN" | "CREATOR" | "USER" {
-        // Check for specific group names
         if (groups.includes("ito-admin")) return "ADMIN";
         if (groups.includes("ito-creator")) return "CREATOR";
         return "USER";
+    }
+
+    async verifyLogoutToken(token: string): Promise<string | null> {
+        try {
+            const { payload } = await jose.jwtVerify(token, this.jwks, {
+                issuer: this.issuer,
+                audience: this.clientId
+            });
+
+            // Backchannel Logout Token Validation
+            // https://openid.net/specs/openid-connect-backchannel-1_0.html
+            if (payload.events && typeof payload.events === 'object' && 'http://schemas.openid.net/event/backchannel-logout' in payload.events) {
+                return payload.sub || null;
+            }
+            return null;
+        } catch (e) {
+            console.error("Logout Token Verification Failed:", e);
+            return null;
+        }
     }
 }

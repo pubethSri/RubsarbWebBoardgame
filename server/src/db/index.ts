@@ -49,12 +49,23 @@ export function initDB() {
         // Table might not exist, ignore
     }
 
+    // Check for id_token column and add if missing (Migration)
+    try {
+        const userCols = db.query("PRAGMA table_info(users)").all() as any[];
+        const hasIdToken = userCols.some(col => col.name === 'id_token');
+        if (!hasIdToken && userCols.length > 0) {
+            console.log("♻️ Adding id_token column to users table...");
+            db.query("ALTER TABLE users ADD COLUMN id_token TEXT").run();
+        }
+    } catch (e) { }
+
     db.query(`
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY, -- authentik 'sub'
             username TEXT UNIQUE NOT NULL,
             role TEXT NOT NULL DEFAULT 'USER',
             token TEXT, -- active session token
+            id_token TEXT, -- OIDC id_token for logout hint
             created_at INTEGER DEFAULT (unixepoch())
         );
     `).run();

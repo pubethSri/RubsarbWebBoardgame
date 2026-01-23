@@ -287,13 +287,14 @@ const app = new Elysia()
                 return "No Authorization Code Provided";
             }
 
-            const accessToken = await authentikService.getToken(code);
-            if (!accessToken) {
+            const tokenResponse = await authentikService.getToken(code);
+            if (!tokenResponse) {
                 set.status = 401;
                 return "Failed to retrieve Access Token from Authentik";
             }
+            const { access_token, id_token } = tokenResponse;
 
-            const userInfo = await authentikService.getUserInfo(accessToken);
+            const userInfo = await authentikService.getUserInfo(access_token);
             if (!userInfo) {
                 set.status = 500;
                 return "Failed to retrieve User Info from Authentik";
@@ -308,19 +309,21 @@ const app = new Elysia()
             // Upsert User
             try {
                 const upsert = db.prepare(`
-                    INSERT INTO users (id, username, role, token) 
-                    VALUES ($id, $username, $role, $token)
+                    INSERT INTO users (id, username, role, token, id_token) 
+                    VALUES ($id, $username, $role, $token, $id_token)
                     ON CONFLICT(id) DO UPDATE SET
                         username = $username,
                         role = $role,
-                        token = $token
+                        token = $token,
+                        id_token = $id_token
                 `);
 
                 upsert.run({
                     $id: userInfo.sub,
                     $username: userInfo.preferred_username,
                     $role: role,
-                    $token: token
+                    $token: token,
+                    $id_token: id_token || null
                 });
 
                 // Set HttpOnly Cookie
@@ -346,12 +349,53 @@ const app = new Elysia()
             }
         })
         .post("/logout", ({ cookie }) => {
+            let redirectUrl: string | undefined;
+
             // @ts-ignore
-            if (cookie && cookie.auth_token) {
+            if (cookie && cookie.auth_token && cookie.auth_token.value) {
+                // @ts-ignore
+                const token = cookie.auth_token.value;
+                const user = AuthUtils.getUserByToken(token);
+
+                // Get id_token from DB for hint
+                if (user) {
+                    // @ts-ignore
+                    const dbUser = db.query("SELECT id_token FROM users WHERE id = ?").get(user.id) as { id_token: string };
+                    if (dbUser && dbUser.id_token) {
+                        redirectUrl = authentikService.getLogoutUrl(dbUser.id_token);
+                    }
+                }
+
+                // Clear Cookie
                 // @ts-ignore
                 cookie.auth_token.remove();
             }
-            return { success: true };
+            return { success: true, redirectUrl };
+        })
+        .post("/backchannel-logout", async ({ body, set }) => {
+            const { logout_token } = body as { logout_token: string };
+            if (!logout_token) {
+                set.status = 400;
+                return "Missing logout_token";
+            }
+
+            const sub = await authentikService.verifyLogoutToken(logout_token);
+            if (!sub) {
+                set.status = 400;
+                return "Invalid Logout Token";
+            }
+
+            console.log(`🔌 Backchannel Logout received for sub: ${sub}`);
+
+            // Invalidate session (Clear token)
+            try {
+                db.query("UPDATE users SET token = NULL, id_token = NULL WHERE id = ?").run(sub);
+                return "OK";
+            } catch (e) {
+                console.error("DB Error during backchannel logout:", e);
+                set.status = 500;
+                return "Internal Error";
+            }
         })
         .get("/me", ({ request, set, cookie }) => {
             // Check Cookie first, then Header
