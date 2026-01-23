@@ -5,42 +5,6 @@
     import Button from "./UI/Button.svelte";
 
     const dispatch = createEventDispatcher();
-
-    let username = "";
-    let password = "";
-    let errorMsg = "";
-    let isLoading = false;
-
-    async function handleLogin() {
-        if (!username || !password) return;
-        isLoading = true;
-        errorMsg = "";
-
-        try {
-            const res = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password }),
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                authStore.set({
-                    username: data.username,
-                    role: data.role,
-                    token: data.token,
-                });
-                dispatch("close");
-            } else {
-                errorMsg = data.message || "Login failed";
-            }
-        } catch (e) {
-            errorMsg = "Connection error";
-        } finally {
-            isLoading = false;
-        }
-    }
 </script>
 
 <div
@@ -59,14 +23,6 @@
         >
             Login
         </h2>
-
-        {#if errorMsg}
-            <div
-                class="bg-primary-red text-white p-2 mb-4 text-sm font-bold font-mono text-center border-4 border-black shadow-[4px_4px_0px_0px_#000000]"
-            >
-                {errorMsg}
-            </div>
-        {/if}
 
         <div class="flex flex-col gap-4">
             <p class="font-mono text-sm text-center text-gray-500 mb-2">

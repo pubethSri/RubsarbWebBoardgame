@@ -3,45 +3,28 @@ import { writable } from "svelte/store";
 export interface User {
     username: string;
     role: "ADMIN" | "CREATOR" | "USER";
-    token: string;
+    // Token is now HttpOnly Cookie
 }
 
-const getStoredUser = (): User | null => {
-    if (typeof localStorage === 'undefined') return null;
-    const stored = localStorage.getItem("auth_user");
-    return stored ? JSON.parse(stored) : null;
-};
+export const authStore = writable<User | null>(null);
 
-export const authStore = writable<User | null>(getStoredUser());
-
-authStore.subscribe((value) => {
-    if (typeof localStorage !== 'undefined') {
-        if (value) {
-            localStorage.setItem("auth_user", JSON.stringify(value));
-        } else {
-            localStorage.removeItem("auth_user");
-        }
-    }
-});
-
-export function logout() {
+export async function logout() {
+    try {
+        await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) { console.error(e); }
     authStore.set(null);
 }
 
 export async function checkSession() {
-    const user = getStoredUser();
-    if (!user) return;
-
-    // Verify token validity with backend
     try {
-        const res = await fetch("/api/auth/me", {
-            headers: { "x-auth-token": user.token }
-        });
-        if (!res.ok) {
-            logout();
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+            const user = await res.json() as User;
+            authStore.set(user);
+        } else {
+            authStore.set(null);
         }
     } catch (e) {
-        // If network error, maybe keep session or logout? Safety -> logout
-        logout();
+        authStore.set(null);
     }
 }

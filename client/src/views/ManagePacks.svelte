@@ -31,9 +31,7 @@
         isLoading = true;
         try {
             // @ts-ignore
-            const res = await fetch("/api/admin/packs", {
-                headers: { "x-auth-token": $authStore?.token || "" },
-            });
+            const res = await fetch("/api/admin/packs", {});
 
             if (res.ok) {
                 packs = await res.json();
@@ -53,7 +51,6 @@
         try {
             const res = await fetch(`/api/admin/packs/${id}`, {
                 method: "DELETE",
-                headers: { "x-auth-token": $authStore!.token },
             });
 
             if (res.ok) {
@@ -69,9 +66,7 @@
     async function viewTopics(pack: any) {
         selectedPack = pack;
         try {
-            const res = await fetch(`/api/admin/packs/${pack.id}/topics`, {
-                headers: { "x-auth-token": $authStore!.token },
-            });
+            const res = await fetch(`/api/admin/packs/${pack.id}/topics`, {});
             if (res.ok) {
                 const rawTopics = await res.json();
                 selectedTopics = rawTopics.map((t: any) => ({
@@ -162,7 +157,6 @@
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
-                        "x-auth-token": $authStore!.token,
                     },
                     body: JSON.stringify({ topics: selectedTopics }),
                 },
@@ -203,7 +197,6 @@
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-auth-token": $authStore!.token,
                 },
                 body: JSON.stringify({ shareCode: newCode.trim() }),
             });

@@ -15,9 +15,7 @@
     async function fetchHistory() {
         isLoading = true;
         try {
-            const res = await fetch("/api/admin/history", {
-                headers: { "x-auth-token": $authStore?.token || "" },
-            });
+            const res = await fetch("/api/admin/history", {});
             if (res.ok) {
                 const logs = await res.json();
                 historyLogs = groupLogs(logs);

@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { socketStore } from "./lib/stores/socket";
   import { gameState } from "./lib/stores/gameState";
-  import { authStore } from "./lib/stores/auth";
+  import { checkSession } from "./lib/stores/auth";
   import Landing from "./views/Landing.svelte";
   import Lobby from "./views/Lobby.svelte";
   import Game from "./views/Game.svelte";
@@ -13,29 +13,8 @@
     const host = window.location.host; // Includes port if present
     socketStore.connect(`${protocol}//${host}/ws`);
 
-    // Check for Auth Token from Authentik Callback
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    if (token) {
-      // Optimistic set
-      authStore.set({ username: "Authenticating...", role: "USER", token });
-
-      // Verify & Get Details
-      fetch("/api/auth/me", {
-        headers: { "x-auth-token": token },
-      })
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            authStore.set({ ...data, token });
-            // Clear URL
-            window.history.replaceState({}, document.title, "/");
-          } else {
-            authStore.set(null);
-          }
-        })
-        .catch(() => authStore.set(null));
-    }
+    // Check for Session via HttpOnly Cookie (Server validates)
+    checkSession();
   });
 </script>
 

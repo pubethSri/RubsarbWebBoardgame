@@ -15,20 +15,26 @@ export const AuthUtils = {
     }
 };
 
+// @ts-ignore
 export function authMiddleware(c: Context) {
-    const token = c.request.headers.get("x-auth-token");
+    // Check for token in Cookie or Header
+    // @ts-ignore
+    const cookieToken = c.cookie?.auth_token?.value;
+    const headerToken = c.request.headers.get("x-auth-token");
+    const token = cookieToken || headerToken;
+
     if (!token) {
         c.set.status = 401;
         return { error: "Unauthorized", message: "Missing Auth Token" };
     }
 
-    const user = AuthUtils.getUserByToken(token);
+    const user = AuthUtils.getUserByToken(token as string);
     if (!user) {
         c.set.status = 401;
         return { error: "Unauthorized", message: "Invalid Session" };
     }
 
-    // Attach user to context (simulated via request for now as Elysia context extension needs type juggling)
+    // Attach user to context
     // @ts-ignore
     c.user = user;
 }

@@ -113,7 +113,6 @@
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-auth-token": $authStore.token,
                 },
                 body: JSON.stringify({
                     name: packName,

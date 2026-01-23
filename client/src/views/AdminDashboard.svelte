@@ -44,9 +44,7 @@
     async function fetchStats(silent: boolean = false) {
         if (!silent) isLoading = true;
         try {
-            const res = await fetch("/api/admin/stats", {
-                headers: { "x-auth-token": $authStore?.token || "" },
-            });
+            const res = await fetch("/api/admin/stats", {});
             if (res.ok) {
                 stats = await res.json();
             }

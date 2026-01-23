@@ -280,7 +280,7 @@ const app = new Elysia()
             const url = authentikService.getAuthorizationUrl();
             return Response.redirect(url);
         })
-        .get("/callback/authentik", async ({ query, set }) => {
+        .get("/callback/authentik", async ({ query, set, cookie }) => {
             const code = query.code as string;
             if (!code) {
                 set.status = 400;
@@ -323,16 +323,43 @@ const app = new Elysia()
                     $token: token
                 });
 
-                // Redirect to Frontend with Token
-                return Response.redirect(`/?token=${token}`);
+                // Set HttpOnly Cookie
+                // @ts-ignore
+                if (cookie && cookie.auth_token) {
+                    // @ts-ignore
+                    cookie.auth_token.set({
+                        value: token,
+                        httpOnly: true,
+                        path: '/',
+                        maxAge: 7 * 86400, // 7 Days
+                        sameSite: 'lax',
+                        secure: process.env.NODE_ENV === 'production'
+                    });
+                }
+
+                // Redirect to Frontend (Clean URL)
+                return Response.redirect('/');
             } catch (e) {
                 console.error("DB Error during login:", e);
                 set.status = 500;
                 return "Internal Database Error";
             }
         })
-        .get("/me", ({ request, set }) => {
-            const token = request.headers.get("x-auth-token");
+        .post("/logout", ({ cookie }) => {
+            // @ts-ignore
+            if (cookie && cookie.auth_token) {
+                // @ts-ignore
+                cookie.auth_token.remove();
+            }
+            return { success: true };
+        })
+        .get("/me", ({ request, set, cookie }) => {
+            // Check Cookie first, then Header
+            // @ts-ignore
+            const cookieToken = cookie?.auth_token?.value;
+            const headerToken = request.headers.get("x-auth-token");
+            const token = typeof cookieToken === 'string' ? cookieToken : headerToken;
+
             if (!token) { set.status = 401; return "No Token"; }
             const user = AuthUtils.getUserByToken(token);
             if (!user) { set.status = 401; return "Invalid Token"; }
