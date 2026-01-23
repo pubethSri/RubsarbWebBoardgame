@@ -45,15 +45,13 @@ export class AuthentikService {
         return `${origin}/application/o/authorize/?${params.toString()}`;
     }
 
-    getLogoutUrl(idToken: string): string {
-        const params = new URLSearchParams({
-            id_token_hint: idToken,
-            // After logout, Authentik should redirect back to home
-            post_logout_redirect_uri: 'https://ito.it.kmitl.ac.th/'
-        });
+    getLogoutUrl(): string {
+        const returnUrl = process.env.NODE_ENV === 'production'
+            ? 'https://ito.it.kmitl.ac.th/'
+            : `http://localhost:${process.env.PORT || 3000}/`;
 
         const origin = new URL(this.issuer).origin;
-        return `${origin}/application/o/ito-app/end-session/?${params.toString()}`;
+        return `${origin}/if/flow/default-invalidation-flow/?next=${encodeURIComponent(returnUrl)}`;
     }
 
     async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {

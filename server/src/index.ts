@@ -360,9 +360,8 @@ const app = new Elysia()
                 // Get id_token from DB for hint
                 if (user) {
                     // @ts-ignore
-                    const dbUser = db.query("SELECT id_token FROM users WHERE id = ?").get(user.id) as { id_token: string };
-                    if (dbUser && dbUser.id_token) {
-                        redirectUrl = authentikService.getLogoutUrl(dbUser.id_token);
+                    if (dbUser) {
+                        redirectUrl = authentikService.getLogoutUrl();
                     }
                 }
 
