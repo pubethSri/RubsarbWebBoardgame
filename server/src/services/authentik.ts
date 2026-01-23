@@ -48,6 +48,7 @@ export class AuthentikService {
     getLogoutUrl(idToken: string): string {
         const params = new URLSearchParams({
             id_token_hint: idToken,
+            prompt: "none",
             // After logout, Authentik should redirect back to home
             post_logout_redirect_uri: process.env.NODE_ENV === 'production'
                 ? 'https://ito.it.kmitl.ac.th/'
