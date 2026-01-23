@@ -38,6 +38,7 @@ export class AuthentikService {
             redirect_uri: this.redirectUri,
             response_type: "code",
             scope: "openid profile email groups",
+            prompt: "login",
         });
 
         const origin = new URL(this.issuer).origin;
