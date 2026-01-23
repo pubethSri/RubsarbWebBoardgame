@@ -355,13 +355,15 @@ const app = new Elysia()
             if (cookie && cookie.auth_token && cookie.auth_token.value) {
                 // @ts-ignore
                 const token = cookie.auth_token.value;
+                console.log("Token:", token);
                 const user = AuthUtils.getUserByToken(token);
 
                 // Get id_token from DB for hint
                 if (user) {
                     // @ts-ignore
-                    if (dbUser) {
-                        redirectUrl = authentikService.getLogoutUrl();
+                    const dbUser = db.query("SELECT id_token FROM users WHERE id = ?").get(user.id) as { id_token: string };
+                    if (dbUser && dbUser.id_token) {
+                        redirectUrl = authentikService.getLogoutUrl(dbUser.id_token);
                     }
                 }
 
