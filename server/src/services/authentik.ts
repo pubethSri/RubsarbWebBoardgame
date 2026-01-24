@@ -51,7 +51,7 @@ export class AuthentikService {
             // After logout, Authentik should redirect back to home
             post_logout_redirect_uri: 'https://ito.it.kmitl.ac.th/'
         });
-
+        console.log(idToken);
         const origin = new URL(this.issuer).origin;
         return `${origin}/application/o/ito-app/end-session/?${params.toString()}`;
     }
