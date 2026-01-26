@@ -56,7 +56,12 @@
     }
 
     function handleLogout() {
-        logout(); // Call exported function
+        logout(); // Call exported function (Global)
+        onBack();
+    }
+
+    function handleLocalLogout() {
+        logout(true); // Local logout
         onBack();
     }
 </script>
@@ -83,7 +88,7 @@
             </h1>
             <div class="flex items-center gap-4">
                 <button
-                    onclick={fetchStats}
+                    onclick={() => fetchStats()}
                     class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors shadow-[4px_4px_0px_0px_#000000] active:translate-y-px active:shadow-none bg-white"
                     title="Refresh Data"
                 >
@@ -93,8 +98,16 @@
                     />
                 </button>
                 <button
+                    onclick={handleLocalLogout}
+                    class="flex items-center gap-2 p-2 px-4 border-2 border-black hover:bg-black hover:text-white transition-colors font-bold uppercase shadow-[4px_4px_0px_0px_#000000] active:translate-y-px active:shadow-none mr-2"
+                    title="Log out of app only"
+                >
+                    Local Logout
+                </button>
+                <button
                     onclick={handleLogout}
-                    class="flex items-center gap-2 p-2 px-4 border-2 border-black hover:bg-black hover:text-white transition-colors font-bold uppercase shadow-[4px_4px_0px_0px_#000000] active:translate-y-px active:shadow-none"
+                    class="flex items-center gap-2 p-2 px-4 border-2 border-black bg-primary-red text-white hover:bg-red-700 transition-colors font-bold uppercase shadow-[4px_4px_0px_0px_#000000] active:translate-y-px active:shadow-none"
+                    title="Global Logout (SSO)"
                 >
                     <LogOut size={20} /> Logout
                 </button>

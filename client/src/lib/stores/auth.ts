@@ -8,9 +8,10 @@ export interface User {
 
 export const authStore = writable<User | null>(null);
 
-export async function logout() {
+export async function logout(local: boolean = false) {
     try {
-        const res = await fetch("/api/auth/logout", { method: "POST" });
+        const url = local ? "/api/auth/logout?local=true" : "/api/auth/logout";
+        const res = await fetch(url, { method: "POST" });
         if (res.ok) {
             const data = await res.json() as { success: boolean, redirectUrl?: string };
             if (data.redirectUrl) {

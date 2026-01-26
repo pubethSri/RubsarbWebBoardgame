@@ -290,8 +290,16 @@
                         >
                     </div>
                     <button
-                        onclick={logout}
+                        onclick={() => logout(true)}
+                        class="bg-white border-2 border-black text-black p-1 hover:bg-gray-100 transition-colors mr-1"
+                        title="Local Logout"
+                    >
+                        <span class="text-xs font-bold px-1">LOCAL</span>
+                    </button>
+                    <button
+                        onclick={() => logout(false)}
                         class="bg-black text-white p-1 hover:bg-primary-red transition-colors"
+                        title="Global Logout"
                     >
                         <Trash2 size={16} />
                     </button>

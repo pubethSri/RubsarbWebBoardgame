@@ -348,18 +348,18 @@ const app = new Elysia()
                 return "Internal Database Error";
             }
         })
-        .post("/logout", ({ cookie }) => {
+        .post("/logout", ({ query, cookie }) => {
             let redirectUrl: string | undefined;
+            const isLocal = query.local === 'true';
 
             // @ts-ignore
             if (cookie && cookie.auth_token && cookie.auth_token.value) {
                 // @ts-ignore
                 const token = cookie.auth_token.value;
-                console.log("Token:", token);
                 const user = AuthUtils.getUserByToken(token);
 
-                // Get id_token from DB for hint
-                if (user) {
+                // Get id_token from DB for hint (ONLY if not local logout)
+                if (user && !isLocal) {
                     // @ts-ignore
                     const dbUser = db.query("SELECT id_token FROM users WHERE id = ?").get(user.id) as { id_token: string };
                     if (dbUser && dbUser.id_token) {
