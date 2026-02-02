@@ -31,15 +31,51 @@ export class KeycloakService {
         this.jwks = jose.createRemoteJWKSet(new URL(`${issuerUrl}/protocol/openid-connect/certs`));
     }
 
-    getAuthorizationUrl(): string {
+    async generatePKCE() {
+        // Generate a random 32-byte verifier (approx 43 chars base64url)
+        // Need high entropy. Node < 19 needs webcrypto polyfill or use native crypto
+        // Since we are in Bun/Elysia environment, we can use globalThis.crypto or Bun.crypto
+
+        const verifier = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('') + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        // Actually standard is 43-128 chars from [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~"
+        // Let's implement correct standard Base64URL generation
+
+        const randomBytes = new Uint8Array(32);
+        crypto.getRandomValues(randomBytes);
+        const codeVerifier = this.base64URLEncode(randomBytes);
+
+        // Calculate Challenge
+        const encoder = new TextEncoder();
+        const data = encoder.encode(codeVerifier);
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        const codeChallenge = this.base64URLEncode(new Uint8Array(hash));
+
+        return { codeVerifier, codeChallenge };
+    }
+
+    private base64URLEncode(buffer: Uint8Array): string {
+        return btoa(String.fromCharCode(...buffer))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    }
+
+    getAuthorizationUrl(codeChallenge?: string): string {
         const params = new URLSearchParams({
             client_id: this.clientId,
             redirect_uri: this.redirectUri,
             response_type: "code",
             scope: "openid profile email",
-            // Keycloak doesn't strictly need prompt=consent but it's good for testing
-            // prompt: "consent", 
         });
+
+        if (codeChallenge) {
+            params.append("code_challenge", codeChallenge);
+            params.append("code_challenge_method", "S256");
+        }
 
         const issuerUrl = this.issuer.endsWith('/') ? this.issuer.slice(0, -1) : this.issuer;
         return `${issuerUrl}/protocol/openid-connect/auth?${params.toString()}`;
@@ -57,7 +93,7 @@ export class KeycloakService {
         return `${issuerUrl}/protocol/openid-connect/logout?${params.toString()}`;
     }
 
-    async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {
+    async getToken(code: string, codeVerifier?: string): Promise<{ access_token: string, id_token?: string } | null> {
         const params = new URLSearchParams({
             grant_type: "authorization_code",
             client_id: this.clientId,
@@ -65,6 +101,10 @@ export class KeycloakService {
             code: code,
             redirect_uri: this.redirectUri,
         });
+
+        if (codeVerifier) {
+            params.append("code_verifier", codeVerifier);
+        }
 
         try {
             const issuerUrl = this.issuer.endsWith('/') ? this.issuer.slice(0, -1) : this.issuer;

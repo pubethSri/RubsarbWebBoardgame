@@ -351,8 +351,25 @@ const app = new Elysia()
                 return "Internal Database Error";
             }
         })
-        .get("/login/keycloak", () => {
-            const url = keycloakService.getAuthorizationUrl();
+        .get("/login/keycloak", async ({ cookie }) => {
+            // Generate PKCE
+            const { codeVerifier, codeChallenge } = await keycloakService.generatePKCE();
+
+            // Store verifier in HttpOnly cookie
+            // @ts-ignore
+            if (cookie && cookie.keycloak_verifier) {
+                // @ts-ignore
+                cookie.keycloak_verifier.set({
+                    value: codeVerifier,
+                    httpOnly: true,
+                    path: '/',
+                    maxAge: 300, // 5 min
+                    sameSite: 'lax',
+                    secure: process.env.NODE_ENV === 'production'
+                });
+            }
+
+            const url = keycloakService.getAuthorizationUrl(codeChallenge);
             return Response.redirect(url);
         })
         .get("/callback/keycloak", async ({ query, set, cookie }) => {
@@ -362,7 +379,22 @@ const app = new Elysia()
                 return "No Authorization Code Provided";
             }
 
-            const tokenResponse = await keycloakService.getToken(code);
+            // Retrieve Verifier
+            // @ts-ignore
+            const codeVerifier = cookie.keycloak_verifier?.value;
+
+            // Optional: If you want to enforce flow integrity, check if verifier exists.
+            // But if user didn't use PKCE flow (old button?), it might be undefined.
+            // With S256 required, it MUST be present.
+
+            const tokenResponse = await keycloakService.getToken(code, codeVerifier);
+
+            // Clear verifier
+            // @ts-ignore
+            if (cookie && cookie.keycloak_verifier) {
+                // @ts-ignore
+                cookie.keycloak_verifier.remove();
+            }
             if (!tokenResponse) {
                 set.status = 401;
                 return "Failed to retrieve Access Token from Keycloak";
