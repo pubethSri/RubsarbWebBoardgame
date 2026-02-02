@@ -31,7 +31,7 @@
             "bg-primary-blue text-white border-4 shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-1 hover:translate-x-1 hover:shadow-[6px_6px_0px_0px_#000000]",
         accent: "bg-primary-yellow text-black border-4 shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-1 hover:translate-x-1 hover:shadow-[6px_6px_0px_0px_#000000]",
         outline:
-            "bg-white text-black border-2 shadow-[4px_4px_0px_0px_#000000] hover:bg-gray-50",
+            "bg-white text-black border-2 shadow-[4px_4px_0px_0px_#000000] hover:bg-gray-50 hover:-translate-y-1 hover:translate-x-1 hover:shadow-[6px_6px_0px_0px_#000000]",
         ghost: "bg-transparent border-2 border-transparent hover:border-black hover:bg-gray-100 shadow-none active:shadow-none active:translate-y-0 active:translate-x-0",
     };
 
