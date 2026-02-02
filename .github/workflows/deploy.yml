@@ -1,0 +1,20 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main  # Or your default branch
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to specific directory
+        run: |
+          cd /home/cruz/RubsarbWebBoardgame
+          git pull origin main
+          docker compose down
+          docker compose up -d --build
