@@ -156,7 +156,7 @@ export class KeycloakService {
 
             return {
                 sub: data.sub,
-                preferred_username: data.preferred_username || data.email || "Unknown",
+                preferred_username: (data.preferred_username || data.email || "Unknown") + " (Keycloak)",
                 groups: data.groups || []
             };
         } catch (e) {
@@ -171,5 +171,23 @@ export class KeycloakService {
         if (groups.includes("ito-admin") || groups.includes("/ito-admin")) return "ADMIN";
         if (groups.includes("ito-creator") || groups.includes("/ito-creator")) return "CREATOR";
         return "USER";
+    }
+
+    async verifyLogoutToken(token: string): Promise<string | null> {
+        try {
+            const { payload } = await jose.jwtVerify(token, this.jwks, {
+                issuer: this.issuer,
+                audience: this.clientId
+            });
+
+            // Backchannel Logout Token Validation
+            if (payload.events && typeof payload.events === 'object' && 'http://schemas.openid.net/event/backchannel-logout' in payload.events) {
+                return payload.sub || null;
+            }
+            return null;
+        } catch (e) {
+            console.error("Keycloak Logout Token Verification Failed:", e);
+            return null;
+        }
     }
 }

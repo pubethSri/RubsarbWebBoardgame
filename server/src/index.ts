@@ -449,10 +449,10 @@ const app = new Elysia()
 
                 // Redirect to Frontend (Clean URL)
                 return Response.redirect('/');
-            } catch (e) {
+            } catch (e: any) {
                 console.error("DB Error during Keycloak login:", e);
                 set.status = 500;
-                return "Internal Database Error";
+                return `Internal Database Error: ${e.message}`;
             }
         })
         .post("/logout", ({ query, cookie }) => {
@@ -511,6 +511,31 @@ const app = new Elysia()
                 return "OK";
             } catch (e) {
                 console.error("DB Error during backchannel logout:", e);
+                set.status = 500;
+                return "Internal Error";
+            }
+        })
+        .post("/backchannel-logout/keycloak", async ({ body, set }) => {
+            const { logout_token } = body as { logout_token: string };
+            if (!logout_token) {
+                set.status = 400;
+                return "Missing logout_token";
+            }
+
+            const sub = await keycloakService.verifyLogoutToken(logout_token);
+            if (!sub) {
+                set.status = 400;
+                return "Invalid Logout Token";
+            }
+
+            console.log(`🔌 Keycloak Backchannel Logout received for sub: ${sub}`);
+
+            // Invalidate session (Clear token)
+            try {
+                db.query("UPDATE users SET token = NULL, id_token = NULL WHERE id = ?").run(sub);
+                return "OK";
+            } catch (e) {
+                console.error("DB Error during Keycloak backchannel logout:", e);
                 set.status = 500;
                 return "Internal Error";
             }
