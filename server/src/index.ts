@@ -345,10 +345,10 @@ const app = new Elysia()
 
                 // Redirect to Frontend (Clean URL)
                 return Response.redirect('/');
-            } catch (e) {
+            } catch (e: any) {
                 console.error("DB Error during login:", e);
                 set.status = 500;
-                return "Internal Database Error";
+                return `Internal Database Error: ${e.message}`;
             }
         })
         .get("/login/keycloak", async ({ cookie }) => {
