@@ -346,6 +346,50 @@ const app = new Elysia()
                 // Redirect to Frontend (Clean URL)
                 return Response.redirect('/');
             } catch (e: any) {
+                // Handle Username Collision for parallel testing
+                if (e.message && e.message.includes("UNIQUE constraint failed: users.username")) {
+                    console.log(`⚠️ Authentik Username Collision for ${userInfo.preferred_username}. Retrying with suffix...`);
+                    try {
+                        const retryUpsert = db.prepare(`
+                            INSERT INTO users (id, username, role, token, id_token) 
+                            VALUES ($id, $username, $role, $token, $id_token)
+                            ON CONFLICT(id) DO UPDATE SET
+                                username = $username,
+                                role = $role,
+                                token = $token,
+                                id_token = $id_token
+                        `);
+
+                        retryUpsert.run({
+                            $id: userInfo.sub,
+                            $username: `${userInfo.preferred_username} (Authentik)`,
+                            $role: role,
+                            $token: token,
+                            $id_token: id_token || null
+                        });
+
+                        // Set HttpOnly Cookie (Repeated for success path)
+                        // @ts-ignore
+                        if (cookie && cookie.auth_token) {
+                            // @ts-ignore
+                            cookie.auth_token.set({
+                                value: token,
+                                httpOnly: true,
+                                path: '/',
+                                maxAge: 7 * 86400, // 7 Days
+                                sameSite: 'lax',
+                                secure: process.env.NODE_ENV === 'production'
+                            });
+                        }
+                        return Response.redirect('/');
+
+                    } catch (retryError: any) {
+                        console.error("DB Error during Authentik login retry:", retryError);
+                        set.status = 500;
+                        return `Internal Database Error (Retry Failed): ${retryError.message}`;
+                    }
+                }
+
                 console.error("DB Error during login:", e);
                 set.status = 500;
                 return `Internal Database Error: ${e.message}`;
