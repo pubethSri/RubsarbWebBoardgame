@@ -1,5 +1,4 @@
 import * as jose from 'jose';
-import * as https from 'https';
 
 export class AuthentikService {
     private clientId: string;
@@ -60,58 +59,38 @@ export class AuthentikService {
     async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {
         const params = new URLSearchParams({
             grant_type: "authorization_code",
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
             code: code,
             redirect_uri: this.redirectUri,
         });
+
+        // Authentik usually expects Client ID and Secret via HTTP Basic Auth for Token Exchange
+        // rather than in the form body
+        const basicAuth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
 
         try {
             const origin = new URL(this.issuer).origin;
             const tokenUrl = `${origin}/application/o/token/`;
 
-            return new Promise((resolve) => {
-                const req = https.request(tokenUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'User-Agent': 'Ito-Backend-Server/1.0',
-                        'Accept': 'application/json',
-                        'Content-Length': Buffer.byteLength(params.toString())
-                    }
-                }, (res) => {
-                    let data = '';
-                    res.on('data', chunk => data += chunk);
-                    res.on('end', () => {
-                        if (res.statusCode !== 200) {
-                            console.error("Token Exchange Failed:", res.statusCode);
-                            console.error("Token Exchange Error Body:", data);
-                            console.error("Attempted Redirect URI:", this.redirectUri);
-                            console.error("Attempted Client ID:", this.clientId);
-                            resolve(null);
-                            return;
-                        }
-                        try {
-                            const parsed = JSON.parse(data);
-                            resolve({
-                                access_token: parsed.access_token,
-                                id_token: parsed.id_token
-                            });
-                        } catch (e) {
-                            console.error("JSON parse error:", e);
-                            resolve(null);
-                        }
-                    });
-                });
-
-                req.on('error', (e) => {
-                    console.error("Network error during token exchange:", e);
-                    resolve(null);
-                });
-
-                req.write(params.toString());
-                req.end();
+            const res = await fetch(tokenUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": `Basic ${basicAuth}`
+                },
+                body: params,
             });
+
+            if (!res.ok) {
+                const text = await res.text();
+                console.error("Token Exchange Failed:", res.status, text);
+                return null;
+            }
+
+            const data = await res.json() as { access_token: string, id_token?: string };
+            return {
+                access_token: data.access_token,
+                id_token: data.id_token
+            };
         } catch (e) {
             console.error("Network error during token exchange:", e);
             return null;
@@ -124,14 +103,7 @@ export class AuthentikService {
 
         try {
             const res = await fetch(infoUrl, {
-                headers: {
-                    "Authorization": `Bearer ${accessToken}`,
-                    "User-Agent": "Ito-Backend-Server/1.0",
-                    "Accept": "application/json"
-                },
-                // @ts-ignore - Bun specific fetch options
-                verbose: true,
-                tls: { rejectUnauthorized: false }
+                headers: { "Authorization": `Bearer ${accessToken}` }
             });
 
             if (!res.ok) {
