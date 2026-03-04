@@ -7,11 +7,13 @@ services:
       - "3000:3000"
     volumes:
       - ./db_data:/app/server/db
+      - ./STAR_IT_KMITL_AC_TH_PACK.crt:/usr/local/share/ca-certificates/STAR_IT_KMITL_AC_TH_PACK.crt:ro
     env_file:
       - .env
     environment:
       # These will override env_file if specified, or fallback to file
       - PORT=3000
+      - NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/STAR_IT_KMITL_AC_TH_PACK.crt
 
   nginx:
     image: nginx:alpine

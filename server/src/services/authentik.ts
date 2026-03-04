@@ -26,7 +26,10 @@ export class AuthentikService {
 
         // Initialize JWKS for signature verification
         const origin = new URL(this.issuer).origin;
-        this.jwks = jose.createRemoteJWKSet(new URL(`${origin}/application/o/ito-app/jwks/`));
+
+        this.jwks = jose.createRemoteJWKSet(
+            new URL(`${origin}/application/o/ito-app/jwks/`)
+        );
         // Note: Generic JWKS URL usually implies looking up via .well-known/openid-configuration, 
         // but for now we assume standard Authentik path or use issuer base. 
         // User screenshot showed /application/o/ito-app/, so JWKS is likely at /application/o/ito-app/jwks/
@@ -72,7 +75,7 @@ export class AuthentikService {
             const res = await fetch(tokenUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: params,
+                body: params
             });
 
             if (!res.ok) {
