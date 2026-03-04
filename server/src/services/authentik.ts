@@ -1,4 +1,5 @@
 import * as jose from 'jose';
+import * as https from 'https';
 
 export class AuthentikService {
     private clientId: string;
@@ -69,33 +70,48 @@ export class AuthentikService {
             const origin = new URL(this.issuer).origin;
             const tokenUrl = `${origin}/application/o/token/`;
 
-            const res = await fetch(tokenUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "Ito-Backend-Server/1.0",
-                    "Accept": "application/json"
-                },
-                body: params,
-                // @ts-ignore - Bun specific fetch options
-                verbose: true,
-                tls: { rejectUnauthorized: false }
+            return new Promise((resolve) => {
+                const req = https.request(tokenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'Ito-Backend-Server/1.0',
+                        'Accept': 'application/json',
+                        'Content-Length': Buffer.byteLength(params.toString())
+                    }
+                }, (res) => {
+                    let data = '';
+                    res.on('data', chunk => data += chunk);
+                    res.on('end', () => {
+                        if (res.statusCode !== 200) {
+                            console.error("Token Exchange Failed:", res.statusCode);
+                            console.error("Token Exchange Error Body:", data);
+                            console.error("Attempted Redirect URI:", this.redirectUri);
+                            console.error("Attempted Client ID:", this.clientId);
+                            resolve(null);
+                            return;
+                        }
+                        try {
+                            const parsed = JSON.parse(data);
+                            resolve({
+                                access_token: parsed.access_token,
+                                id_token: parsed.id_token
+                            });
+                        } catch (e) {
+                            console.error("JSON parse error:", e);
+                            resolve(null);
+                        }
+                    });
+                });
+
+                req.on('error', (e) => {
+                    console.error("Network error during token exchange:", e);
+                    resolve(null);
+                });
+
+                req.write(params.toString());
+                req.end();
             });
-
-            if (!res.ok) {
-                const text = await res.text();
-                console.error("Token Exchange Failed:", res.status);
-                console.error("Token Exchange Error Body:", text);
-                console.error("Attempted Redirect URI:", this.redirectUri);
-                console.error("Attempted Client ID:", this.clientId);
-                return null;
-            }
-
-            const data = await res.json() as { access_token: string, id_token?: string };
-            return {
-                access_token: data.access_token,
-                id_token: data.id_token
-            };
         } catch (e) {
             console.error("Network error during token exchange:", e);
             return null;
