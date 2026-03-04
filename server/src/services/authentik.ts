@@ -71,7 +71,11 @@ export class AuthentikService {
 
             const res = await fetch(tokenUrl, {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "Ito-Backend-Server/1.0",
+                    "Accept": "application/json"
+                },
                 body: params,
                 // @ts-ignore - Bun specific fetch options
                 verbose: true,
@@ -104,7 +108,11 @@ export class AuthentikService {
 
         try {
             const res = await fetch(infoUrl, {
-                headers: { "Authorization": `Bearer ${accessToken}` },
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "User-Agent": "Ito-Backend-Server/1.0",
+                    "Accept": "application/json"
+                },
                 // @ts-ignore - Bun specific fetch options
                 verbose: true,
                 tls: { rejectUnauthorized: false }
