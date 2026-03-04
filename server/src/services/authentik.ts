@@ -77,7 +77,10 @@ export class AuthentikService {
 
             if (!res.ok) {
                 const text = await res.text();
-                console.error("Token Exchange Failed:", res.status, text);
+                console.error("Token Exchange Failed:", res.status);
+                console.error("Token Exchange Error Body:", text);
+                console.error("Attempted Redirect URI:", this.redirectUri);
+                console.error("Attempted Client ID:", this.clientId);
                 return null;
             }
 
