@@ -9,13 +9,11 @@ import { rateLimit } from './middleware/rateLimit';
 // import { creatorAuth } from './middleware/creatorAuth';
 import { AuthUtils, authMiddleware } from './auth';
 import { AuthentikService } from './services/authentik';
-import { KeycloakService } from './services/keycloak';
 import * as jose from 'jose';
 import { staticPlugin } from "@elysiajs/static";
 import { CreatePackSchema } from './schemas/topic';
 
 const authentikService = new AuthentikService();
-const keycloakService = new KeycloakService();
 
 // Initialize Database & Run Migrations
 initDB();
@@ -395,110 +393,6 @@ const app = new Elysia()
                 return `Internal Database Error: ${e.message}`;
             }
         })
-        .get("/login/keycloak", async ({ cookie }) => {
-            // Generate PKCE
-            const { codeVerifier, codeChallenge } = await keycloakService.generatePKCE();
-
-            // Store verifier in HttpOnly cookie
-            // @ts-ignore
-            if (cookie && cookie.keycloak_verifier) {
-                // @ts-ignore
-                cookie.keycloak_verifier.set({
-                    value: codeVerifier,
-                    httpOnly: true,
-                    path: '/',
-                    maxAge: 300, // 5 min
-                    sameSite: 'lax',
-                    secure: process.env.NODE_ENV === 'production'
-                });
-            }
-
-            const url = keycloakService.getAuthorizationUrl(codeChallenge);
-            return Response.redirect(url);
-        })
-        .get("/callback/keycloak", async ({ query, set, cookie }) => {
-            const code = query.code as string;
-            if (!code) {
-                set.status = 400;
-                return "No Authorization Code Provided";
-            }
-
-            // Retrieve Verifier
-            // @ts-ignore
-            const codeVerifier = cookie.keycloak_verifier?.value;
-
-            // Optional: If you want to enforce flow integrity, check if verifier exists.
-            // But if user didn't use PKCE flow (old button?), it might be undefined.
-            // With S256 required, it MUST be present.
-
-            const tokenResponse = await keycloakService.getToken(code, codeVerifier);
-
-            // Clear verifier
-            // @ts-ignore
-            if (cookie && cookie.keycloak_verifier) {
-                // @ts-ignore
-                cookie.keycloak_verifier.remove();
-            }
-            if (!tokenResponse) {
-                set.status = 401;
-                return "Failed to retrieve Access Token from Keycloak";
-            }
-            const { access_token, id_token } = tokenResponse;
-
-            const userInfo = await keycloakService.getUserInfo(access_token);
-            if (!userInfo) {
-                set.status = 500;
-                return "Failed to retrieve User Info from Keycloak";
-            }
-
-            // Map Roles
-            const role = keycloakService.mapGroupsToRole(userInfo.groups);
-
-            // Generate Session Token
-            const token = AuthUtils.createToken();
-
-            // Upsert User
-            try {
-                const upsert = db.prepare(`
-                    INSERT INTO users (id, username, role, token, id_token) 
-                    VALUES ($id, $username, $role, $token, $id_token)
-                    ON CONFLICT(id) DO UPDATE SET
-                        username = $username,
-                        role = $role,
-                        token = $token,
-                        id_token = $id_token
-                `);
-
-                upsert.run({
-                    $id: userInfo.sub,
-                    $username: userInfo.preferred_username,
-                    $role: role,
-                    $token: token,
-                    $id_token: id_token || null
-                });
-
-                // Set HttpOnly Cookie
-                // @ts-ignore
-                if (cookie && cookie.auth_token) {
-                    // @ts-ignore
-                    cookie.auth_token.set({
-                        value: token,
-                        httpOnly: true,
-                        path: '/',
-                        maxAge: 7 * 86400, // 7 Days
-                        sameSite: 'lax',
-                        secure: process.env.NODE_ENV === 'production'
-                    });
-                }
-
-                // Redirect to Frontend (Clean URL)
-                return Response.redirect('/');
-            } catch (e: any) {
-                console.error("DB Error during Keycloak login:", e);
-                set.status = 500;
-                return `Internal Database Error: ${e.message}`;
-            }
-        })
         .post("/logout", ({ query, cookie }) => {
             let redirectUrl: string | undefined;
             const isLocal = query.local === 'true';
@@ -519,8 +413,6 @@ const app = new Elysia()
                             const claims = jose.decodeJwt(dbUser.id_token);
                             if (claims.iss?.includes("authentik") || claims.iss?.includes("application/o/ito-app")) {
                                 redirectUrl = authentikService.getLogoutUrl(dbUser.id_token);
-                            } else if (claims.iss?.includes("keycloak") || claims.iss?.includes("realms/itkmitl")) {
-                                redirectUrl = keycloakService.getLogoutUrl(dbUser.id_token);
                             }
                         } catch (e) {
                             console.error("Failed to decode id_token for logout:", e);
@@ -555,31 +447,6 @@ const app = new Elysia()
                 return "OK";
             } catch (e) {
                 console.error("DB Error during backchannel logout:", e);
-                set.status = 500;
-                return "Internal Error";
-            }
-        })
-        .post("/backchannel-logout/keycloak", async ({ body, set }) => {
-            const { logout_token } = body as { logout_token: string };
-            if (!logout_token) {
-                set.status = 400;
-                return "Missing logout_token";
-            }
-
-            const sub = await keycloakService.verifyLogoutToken(logout_token);
-            if (!sub) {
-                set.status = 400;
-                return "Invalid Logout Token";
-            }
-
-            console.log(`🔌 Keycloak Backchannel Logout received for sub: ${sub}`);
-
-            // Invalidate session (Clear token)
-            try {
-                db.query("UPDATE users SET token = NULL, id_token = NULL WHERE id = ?").run(sub);
-                return "OK";
-            } catch (e) {
-                console.error("DB Error during Keycloak backchannel logout:", e);
                 set.status = 500;
                 return "Internal Error";
             }

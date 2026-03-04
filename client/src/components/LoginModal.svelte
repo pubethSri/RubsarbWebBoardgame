@@ -40,17 +40,6 @@
                 LOGIN WITH AUTHENTIK
             </Button>
 
-            <Button
-                variant="outline"
-                fullWidth
-                size="lg"
-                onclick={() =>
-                    (window.location.href = "/api/auth/login/keycloak")}
-                class="h-16 text-xl border-4 mt-2"
-            >
-                LOGIN WITH KEYCLOAK
-            </Button>
-
             <div class="text-[10px] font-mono text-center text-gray-400 mt-2">
                 SECURED BY OIDC
             </div>
