@@ -567,10 +567,15 @@ const app = new Elysia()
             // Optional: shared derive logic
         })
         .guard({ beforeHandle: [authMiddleware] }, app => app
-            .onBeforeHandle(({ request, set }) => {
+            .onBeforeHandle(({ request, set, cookie }) => {
                 // Double check admin role
                 // @ts-ignore
-                const user = AuthUtils.getUserByToken(request.headers.get("x-auth-token"));
+                const cookieToken = cookie?.auth_token?.value;
+                const headerToken = request.headers.get("x-auth-token");
+                const token = typeof cookieToken === 'string' ? cookieToken : headerToken;
+
+                // @ts-ignore
+                const user = AuthUtils.getUserByToken(token);
                 if (!user || (user.role !== 'ADMIN' && user.role !== 'CREATOR')) {
                     set.status = 403;
                     return "Admins or Creators only";
