@@ -59,13 +59,11 @@ export class AuthentikService {
     async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {
         const params = new URLSearchParams({
             grant_type: "authorization_code",
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
             code: code,
             redirect_uri: this.redirectUri,
         });
-
-        // Authentik usually expects Client ID and Secret via HTTP Basic Auth for Token Exchange
-        // rather than in the form body
-        const basicAuth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
 
         try {
             const origin = new URL(this.issuer).origin;
@@ -73,10 +71,7 @@ export class AuthentikService {
 
             const res = await fetch(tokenUrl, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": `Basic ${basicAuth}`
-                },
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: params,
             });
 
