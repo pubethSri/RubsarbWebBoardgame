@@ -45,6 +45,23 @@ export class AuthentikService {
         return `${origin}/application/o/authorize/?${params.toString()}`;
     }
 
+    getSilentRedirectUri(): string {
+        return `${this.redirectUri}/silent`;
+    }
+
+    getSilentAuthorizationUrl(): string {
+        const params = new URLSearchParams({
+            client_id: this.clientId,
+            redirect_uri: this.getSilentRedirectUri(),
+            response_type: "code",
+            scope: "openid profile email groups",
+            prompt: "none",
+        });
+
+        const origin = new URL(this.issuer).origin;
+        return `${origin}/application/o/authorize/?${params.toString()}`;
+    }
+
     getLogoutUrl(idToken: string): string {
         const params = new URLSearchParams({
             id_token_hint: idToken,
@@ -56,13 +73,13 @@ export class AuthentikService {
         return `${origin}/application/o/ito-app/end-session/?${params.toString()}`;
     }
 
-    async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {
+    async getToken(code: string, redirectUri: string = this.redirectUri): Promise<{ access_token: string, id_token?: string } | null> {
         const params = new URLSearchParams({
             grant_type: "authorization_code",
             client_id: this.clientId,
             client_secret: this.clientSecret,
             code: code,
-            redirect_uri: this.redirectUri,
+            redirect_uri: redirectUri,
         });
 
         try {

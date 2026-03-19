@@ -393,6 +393,129 @@ const app = new Elysia()
                 return `Internal Database Error: ${e.message}`;
             }
         })
+        .get("/login/authentik/silent", () => {
+            const url = authentikService.getSilentAuthorizationUrl();
+            return Response.redirect(url);
+        })
+        .get("/callback/authentik/silent", async ({ query, set, cookie }) => {
+            const error = query.error as string;
+            if (error) {
+                set.headers['Content-Type'] = 'text/html';
+                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: '${error}' }, window.location.origin);</script>`;
+            }
+
+            const code = query.code as string;
+            if (!code) {
+                set.status = 400;
+                set.headers['Content-Type'] = 'text/html';
+                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'no_code' }, window.location.origin);</script>`;
+            }
+
+            const redirectUri = authentikService.getSilentRedirectUri();
+            const tokenResponse = await authentikService.getToken(code, redirectUri);
+            
+            if (!tokenResponse) {
+                set.status = 401;
+                set.headers['Content-Type'] = 'text/html';
+                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'token_exchange_failed' }, window.location.origin);</script>`;
+            }
+            const { access_token, id_token } = tokenResponse;
+
+            const userInfo = await authentikService.getUserInfo(access_token);
+            if (!userInfo) {
+                set.status = 500;
+                set.headers['Content-Type'] = 'text/html';
+                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'userinfo_failed' }, window.location.origin);</script>`;
+            }
+
+            const role = authentikService.mapGroupsToRole(userInfo.groups);
+            const token = AuthUtils.createToken();
+
+            try {
+                const upsert = db.prepare(`
+                    INSERT INTO users (id, username, role, token, id_token) 
+                    VALUES ($id, $username, $role, $token, $id_token)
+                    ON CONFLICT(id) DO UPDATE SET
+                        username = $username,
+                        role = $role,
+                        token = $token,
+                        id_token = $id_token
+                `);
+
+                upsert.run({
+                    $id: userInfo.sub,
+                    $username: userInfo.preferred_username,
+                    $role: role,
+                    $token: token,
+                    $id_token: id_token || null
+                });
+
+                // @ts-ignore
+                if (cookie && cookie.auth_token) {
+                    // @ts-ignore
+                    cookie.auth_token.set({
+                        value: token,
+                        httpOnly: true,
+                        path: '/',
+                        maxAge: 7 * 86400, // 7 Days
+                        sameSite: 'lax',
+                        secure: process.env.NODE_ENV === 'production'
+                    });
+                }
+
+                set.headers['Content-Type'] = 'text/html';
+                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_SUCCESS' }, window.location.origin);</script>`;
+            } catch (e: any) {
+                if (e.message && e.message.includes("UNIQUE constraint failed: users.username")) {
+                    console.log(`⚠️ Authentik Username Collision for ${userInfo.preferred_username}. Retrying with suffix...`);
+                    try {
+                        const retryUpsert = db.prepare(`
+                            INSERT INTO users (id, username, role, token, id_token) 
+                            VALUES ($id, $username, $role, $token, $id_token)
+                            ON CONFLICT(id) DO UPDATE SET
+                                username = $username,
+                                role = $role,
+                                token = $token,
+                                id_token = $id_token
+                        `);
+
+                        retryUpsert.run({
+                            $id: userInfo.sub,
+                            $username: `${userInfo.preferred_username} (Authentik)`,
+                            $role: role,
+                            $token: token,
+                            $id_token: id_token || null
+                        });
+
+                        // @ts-ignore
+                        if (cookie && cookie.auth_token) {
+                            // @ts-ignore
+                            cookie.auth_token.set({
+                                value: token,
+                                httpOnly: true,
+                                path: '/',
+                                maxAge: 7 * 86400, // 7 Days
+                                sameSite: 'lax',
+                                secure: process.env.NODE_ENV === 'production'
+                            });
+                        }
+                        
+                        set.headers['Content-Type'] = 'text/html';
+                        return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_SUCCESS' }, window.location.origin);</script>`;
+                    } catch (retryError: any) {
+                        console.error("DB Error during silent Authentik login retry:", retryError);
+                        set.status = 500;
+                        set.headers['Content-Type'] = 'text/html';
+                        return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'db_error_retry' }, window.location.origin);</script>`;
+                    }
+                }
+
+                console.error("DB Error during silent login:", e);
+                set.status = 500;
+                set.headers['Content-Type'] = 'text/html';
+                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'db_error' }, window.location.origin);</script>`;
+            }
+        })
         .post("/logout", ({ query, cookie }) => {
             let redirectUrl: string | undefined;
             const isLocal = query.local === 'true';
