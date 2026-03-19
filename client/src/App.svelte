@@ -2,10 +2,12 @@
   import { onMount } from "svelte";
   import { socketStore } from "./lib/stores/socket";
   import { gameState } from "./lib/stores/gameState";
-  import { checkSession, checkSilentSession, authStore, silentAuthStatus } from "./lib/stores/auth";
+  import { checkSession, checkSilentSession, authStore } from "./lib/stores/auth";
   import Landing from "./views/Landing.svelte";
   import Lobby from "./views/Lobby.svelte";
   import Game from "./views/Game.svelte";
+
+  let isInitializing = true;
 
   onMount(async () => {
     // Connect to the Elysia server (Relative path handles both Dev Proxy and Prod)
@@ -16,15 +18,19 @@
     // Check for Session via HttpOnly Cookie (Server validates)
     const isLoggedIn = await checkSession();
     if (!isLoggedIn) {
-      checkSilentSession();
+      if (!sessionStorage.getItem("silent_auth_checked")) {
+        checkSilentSession();
+        return; // Halt initialization, UI will redirect shortly
+      }
     }
+    isInitializing = false;
   });
 </script>
 
 <main
   class="min-h-screen bg-white font-sans text-black selection:bg-black selection:text-white"
 >
-  {#if !$gameState.isConnected || ($authStore === null && $silentAuthStatus === 'LOADING')}
+  {#if isInitializing || !$gameState.isConnected}
     <div class="flex items-center justify-center min-h-screen flex-col gap-4">
       <div
         class="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin"

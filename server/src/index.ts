@@ -400,32 +400,25 @@ const app = new Elysia()
         .get("/callback/authentik/silent", async ({ query, set, cookie }) => {
             const error = query.error as string;
             if (error) {
-                set.headers['Content-Type'] = 'text/html';
-                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: '${error}' }, window.location.origin);</script>`;
+                return Response.redirect('/');
             }
 
             const code = query.code as string;
             if (!code) {
-                set.status = 400;
-                set.headers['Content-Type'] = 'text/html';
-                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'no_code' }, window.location.origin);</script>`;
+                return Response.redirect('/?error=no_code');
             }
 
             const redirectUri = authentikService.getSilentRedirectUri();
             const tokenResponse = await authentikService.getToken(code, redirectUri);
             
             if (!tokenResponse) {
-                set.status = 401;
-                set.headers['Content-Type'] = 'text/html';
-                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'token_exchange_failed' }, window.location.origin);</script>`;
+                return Response.redirect('/?error=token_exchange_failed');
             }
             const { access_token, id_token } = tokenResponse;
 
             const userInfo = await authentikService.getUserInfo(access_token);
             if (!userInfo) {
-                set.status = 500;
-                set.headers['Content-Type'] = 'text/html';
-                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'userinfo_failed' }, window.location.origin);</script>`;
+                return Response.redirect('/?error=userinfo_failed');
             }
 
             const role = authentikService.mapGroupsToRole(userInfo.groups);
@@ -463,8 +456,7 @@ const app = new Elysia()
                     });
                 }
 
-                set.headers['Content-Type'] = 'text/html';
-                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_SUCCESS' }, window.location.origin);</script>`;
+                return Response.redirect('/');
             } catch (e: any) {
                 if (e.message && e.message.includes("UNIQUE constraint failed: users.username")) {
                     console.log(`⚠️ Authentik Username Collision for ${userInfo.preferred_username}. Retrying with suffix...`);
@@ -500,20 +492,15 @@ const app = new Elysia()
                             });
                         }
                         
-                        set.headers['Content-Type'] = 'text/html';
-                        return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_SUCCESS' }, window.location.origin);</script>`;
+                        return Response.redirect('/');
                     } catch (retryError: any) {
                         console.error("DB Error during silent Authentik login retry:", retryError);
-                        set.status = 500;
-                        set.headers['Content-Type'] = 'text/html';
-                        return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'db_error_retry' }, window.location.origin);</script>`;
+                        return Response.redirect('/?error=db_error_retry');
                     }
                 }
 
                 console.error("DB Error during silent login:", e);
-                set.status = 500;
-                set.headers['Content-Type'] = 'text/html';
-                return `<script>window.parent.postMessage({ type: 'SILENT_AUTH_ERROR', error: 'db_error' }, window.location.origin);</script>`;
+                return Response.redirect('/?error=db_error');
             }
         })
         .post("/logout", ({ query, cookie }) => {
