@@ -7,12 +7,14 @@ export default defineConfig({
   plugins: [svelte(), tailwindcss()],
   server: {
     proxy: {
+      // 127.0.0.1 instead of localhost: on some systems (e.g. Windows) the
+      // proxy resolves localhost to ::1 while the Bun server listens on IPv4.
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: 'ws://127.0.0.1:3000',
         ws: true,
       }
     }

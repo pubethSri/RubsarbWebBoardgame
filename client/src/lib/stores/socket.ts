@@ -14,7 +14,7 @@ export const socketStore = {
             gameState.setConnected(true);
 
             // AUTO-RECONNECT LOGIC
-            const sessionRaw = localStorage.getItem('game_session');
+            const sessionRaw = sessionStorage.getItem('game_session');
             if (sessionRaw) {
                 try {
                     const session = JSON.parse(sessionRaw);
@@ -30,7 +30,7 @@ export const socketStore = {
                     }
                 } catch (e) {
                     console.error("Invalid session data", e);
-                    localStorage.removeItem('game_session');
+                    sessionStorage.removeItem('game_session');
                 }
             }
         };
@@ -43,7 +43,7 @@ export const socketStore = {
                 switch (msg.type) {
                     case 'JOINED_ROOM':
                         gameState.joinRoom(msg.payload.code, msg.payload.playerId);
-                        localStorage.setItem('game_session', JSON.stringify({
+                        sessionStorage.setItem('game_session', JSON.stringify({
                             token: msg.payload.token,
                             roomId: msg.payload.code,
                             playerId: msg.payload.playerId
@@ -58,9 +58,12 @@ export const socketStore = {
                     case 'ROUND_ENDED':
                         gameState.setRoundResult(msg.payload.result, msg.payload.board);
                         break;
+                    case 'GAME_COMPLETE':
+                        gameState.setGameComplete(msg.payload.board, msg.payload.level);
+                        break;
                     case 'WELCOME_BACK':
                         // Restore state
-                        const session = localStorage.getItem('game_session');
+                        const session = sessionStorage.getItem('game_session');
                         const playerId = session ? JSON.parse(session).playerId : null;
                         if (playerId) {
                             gameState.setFullState(msg.payload.gameState, msg.payload.hand, playerId);
@@ -69,13 +72,13 @@ export const socketStore = {
                     case 'ERROR':
                         // If session error (e.g. expired), clear storage
                         if (msg.payload.message.includes('Session expired')) {
-                            localStorage.removeItem('game_session');
+                            sessionStorage.removeItem('game_session');
                             window.location.reload();
                         }
                         gameState.setError(msg.payload.message);
                         break;
                     case 'KICKED':
-                        localStorage.removeItem('game_session');
+                        sessionStorage.removeItem('game_session');
                         gameState.setError("You have been kicked from the room.");
                         gameState.leaveRoom();
                         if (socket) socket.close();
@@ -105,7 +108,7 @@ export const socketStore = {
     },
 
     disconnect: () => {
-        localStorage.removeItem('game_session');
+        sessionStorage.removeItem('game_session');
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'LEAVE_ROOM', payload: null }));
         }

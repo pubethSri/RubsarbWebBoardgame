@@ -13,14 +13,14 @@
         class="absolute inset-0 z-0 opacity-10 pointer-events-none"
         style="background-image: radial-gradient(#000 2px, transparent 2px); background-size: 20px 20px;"
     ></div>
-    {#if $gameState.gameState === "ROUND_END"}
+    {#if $gameState.gameState === "ROUND_END" || $gameState.gameState === "GAME_COMPLETE"}
         <Result
             result={$gameState.roundResult || "WIN"}
             finalBoard={$gameState.board}
             topic={$gameState.topic}
             level={$gameState.lastRoundLevel}
-            readyCount={$gameState.readyCount}
             playerCount={$gameState.players.length}
+            gameComplete={$gameState.gameState === "GAME_COMPLETE"}
         />
     {:else}
         <PlayerList />

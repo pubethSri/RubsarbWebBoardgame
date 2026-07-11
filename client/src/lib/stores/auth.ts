@@ -8,6 +8,21 @@ export interface User {
 
 export const authStore = writable<User | null>(null);
 
+// Whether the server has an IdP configured; hides the login UI when it doesn't.
+export const oidcEnabled = writable<boolean>(false);
+
+export async function fetchAuthConfig() {
+    try {
+        const res = await fetch("/api/auth/config");
+        if (res.ok) {
+            const config = await res.json() as { oidcEnabled: boolean };
+            oidcEnabled.set(config.oidcEnabled);
+        }
+    } catch (e) {
+        oidcEnabled.set(false);
+    }
+}
+
 export async function logout(local: boolean = false) {
     try {
         const url = local ? "/api/auth/logout?local=true" : "/api/auth/logout";
@@ -41,10 +56,3 @@ export async function checkSession(): Promise<boolean> {
     }
 }
 
-export function checkSilentSession() {
-    const hasChecked = sessionStorage.getItem("silent_auth_checked");
-    if (!hasChecked) {
-        sessionStorage.setItem("silent_auth_checked", "true");
-        window.location.href = '/api/auth/login/authentik/silent';
-    }
-}

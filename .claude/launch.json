@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "cwd": "server",
+      "runtimeExecutable": "C:\\Users\\Me\\scoop\\shims\\bun.exe",
+      "runtimeArgs": ["run", "src/index.ts"],
+      "port": 3000
+    },
+    {
+      "name": "client",
+      "cwd": "client",
+      "runtimeExecutable": "C:\\Users\\Me\\scoop\\shims\\bun.exe",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
+    }
+  ]
+}

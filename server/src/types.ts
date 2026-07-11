@@ -30,7 +30,7 @@ export interface Card {
     note?: string;
 }
 
-export type GameStatus = 'LOBBY' | 'PLAYING' | 'REVEAL' | 'ROUND_END';
+export type GameStatus = 'LOBBY' | 'PLAYING' | 'ROUND_END' | 'GAME_COMPLETE';
 
 export interface Topic {
     text: string;
@@ -46,7 +46,6 @@ export interface RoomState {
     topic: Topic | null;
     version: number;
     level: number;
-    readyCount: number;
     activePackId: string;
     activePackName: string;
     roundResult?: 'WIN' | 'LOSS';
@@ -61,10 +60,7 @@ export type WsMessage =
     | { type: 'MOVE_CARD'; payload: { cardId: string; targetIndex: number } }
     | { type: 'RETURN_CARD'; payload: { cardId: string } }
     | { type: 'UPDATE_NOTE'; payload: { cardId: string; note: string } }
-    | { type: 'UPDATE_BOARD'; payload: { board: Card[] } }
     | { type: 'REVEAL_NEXT'; payload: null }
-    | { type: 'PLAYER_READY'; payload: null }
-    | { type: 'PLAYER_READY'; payload: null }
     | { type: 'RECONNECT'; payload: { token: string; roomId: string } }
     | { type: 'CHANGE_COLOR'; payload: { color: string } }
     | { type: 'KICK_PLAYER'; payload: { playerId: string } }
@@ -76,6 +72,7 @@ export type WsResponse =
     | { type: 'JOINED_ROOM'; payload: { code: string; playerId: string; token: string } }
     | { type: 'GAME_STARTED'; payload: { hand: Card[]; board: Card[] } }
     | { type: 'ROUND_ENDED'; payload: { result: 'WIN' | 'LOSS'; board: Card[] } }
+    | { type: 'GAME_COMPLETE'; payload: { board: Card[]; level: number } }
     | { type: 'WELCOME_BACK'; payload: { gameState: RoomState; hand: Card[] } }
     | { type: 'PLAYER_DC'; payload: { playerId: string } }
     | { type: 'PLAYER_RECONNECTED'; payload: { playerId: string } }

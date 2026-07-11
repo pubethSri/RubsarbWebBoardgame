@@ -4,32 +4,40 @@ export class AuthentikService {
     private clientId: string;
     private clientSecret: string;
     private issuer: string;
+    private baseUrl: string;
     private redirectUri: string;
+    private appSlug: string;
     private jwks: ReturnType<typeof jose.createRemoteJWKSet>;
 
-    constructor() {
-        this.clientId = process.env.OIDC_CLIENT_ID || "";
-        this.clientSecret = process.env.OIDC_CLIENT_SECRET || "";
-        this.issuer = process.env.AUTHENTIK_ISSUER || "";
-        // Auto-detect environment for redirect URI
-        const baseUrl = process.env.NODE_ENV === 'production'
-            ? 'https://ito.it.kmitl.ac.th'
-            : `http://localhost:${process.env.PORT || 3000}`;
+    /**
+     * Returns null when OIDC env vars are absent so the game can run
+     * fully anonymous (auth is only needed for pack creation / admin).
+     */
+    static fromEnv(): AuthentikService | null {
+        const clientId = process.env.OIDC_CLIENT_ID;
+        const clientSecret = process.env.OIDC_CLIENT_SECRET;
+        const issuer = process.env.AUTHENTIK_ISSUER;
 
-        this.redirectUri = `${baseUrl}/api/auth/callback/authentik`;
-
-        if (!this.clientId || !this.clientSecret || !this.issuer) {
-            console.error("❌ Authentik credentials missing in .env");
-            console.error(`Client ID: ${!!this.clientId}, Secret: ${!!this.clientSecret}, Issuer: ${!!this.issuer}`);
-            throw new Error("Missing Authentik Environment Variables (OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, AUTHENTIK_ISSUER)");
+        if (!clientId || !clientSecret || !issuer) {
+            console.log("ℹ️  OIDC disabled (OIDC_CLIENT_ID / OIDC_CLIENT_SECRET / AUTHENTIK_ISSUER not set)");
+            return null;
         }
+        return new AuthentikService(clientId, clientSecret, issuer);
+    }
 
-        // Initialize JWKS for signature verification
+    private constructor(clientId: string, clientSecret: string, issuer: string) {
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        this.issuer = issuer;
+        this.baseUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`;
+        this.redirectUri = `${this.baseUrl}/api/auth/callback/authentik`;
+        this.appSlug = process.env.OIDC_APP_SLUG || "ito-app";
+
+        // Authentik publishes per-application JWKS under /application/o/<slug>/jwks/
         const origin = new URL(this.issuer).origin;
-        this.jwks = jose.createRemoteJWKSet(new URL(`${origin}/application/o/ito-app/jwks/`));
-        // Note: Generic JWKS URL usually implies looking up via .well-known/openid-configuration, 
-        // but for now we assume standard Authentik path or use issuer base. 
-        // User screenshot showed /application/o/ito-app/, so JWKS is likely at /application/o/ito-app/jwks/
+        this.jwks = jose.createRemoteJWKSet(new URL(`${origin}/application/o/${this.appSlug}/jwks/`));
+
+        console.log(`🔐 OIDC enabled (issuer: ${this.issuer}, redirect: ${this.redirectUri})`);
     }
 
     getAuthorizationUrl(): string {
@@ -45,41 +53,22 @@ export class AuthentikService {
         return `${origin}/application/o/authorize/?${params.toString()}`;
     }
 
-    getSilentRedirectUri(): string {
-        return `${this.redirectUri}/silent`;
-    }
-
-    getSilentAuthorizationUrl(): string {
-        const params = new URLSearchParams({
-            client_id: this.clientId,
-            redirect_uri: this.getSilentRedirectUri(),
-            response_type: "code",
-            scope: "openid profile email groups",
-            prompt: "none",
-        });
-
-        const origin = new URL(this.issuer).origin;
-        return `${origin}/application/o/authorize/?${params.toString()}`;
-    }
-
     getLogoutUrl(idToken: string): string {
         const params = new URLSearchParams({
             id_token_hint: idToken,
-            // After logout, Authentik should redirect back to home
-            post_logout_redirect_uri: 'https://ito.it.kmitl.ac.th/'
+            post_logout_redirect_uri: `${this.baseUrl}/`
         });
-        console.log(idToken);
         const origin = new URL(this.issuer).origin;
-        return `${origin}/application/o/ito-app/end-session/?${params.toString()}`;
+        return `${origin}/application/o/${this.appSlug}/end-session/?${params.toString()}`;
     }
 
-    async getToken(code: string, redirectUri: string = this.redirectUri): Promise<{ access_token: string, id_token?: string } | null> {
+    async getToken(code: string): Promise<{ access_token: string, id_token?: string } | null> {
         const params = new URLSearchParams({
             grant_type: "authorization_code",
             client_id: this.clientId,
             client_secret: this.clientSecret,
             code: code,
-            redirect_uri: redirectUri,
+            redirect_uri: this.redirectUri,
         });
 
         try {

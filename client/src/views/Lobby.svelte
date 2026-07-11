@@ -268,7 +268,7 @@
                 class="flex justify-between items-end mb-4 border-b-4 border-black"
             >
                 <h2 class="brutal-text text-xl">
-                    Players ({$gameState.players.length}/10)
+                    Players ({$gameState.players.length}/8)
                 </h2>
             </div>
 

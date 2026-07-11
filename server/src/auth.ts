@@ -1,39 +1,42 @@
 import { db } from "./db";
 import type { Context } from "elysia";
 
-export const AuthUtils = {
-    verifyPassword: async (password: string, hash: string) => {
-        return await Bun.password.verify(password, hash);
-    },
+export interface SessionUser {
+    id: string;
+    username: string;
+    role: string;
+}
 
+export const AuthUtils = {
     createToken: () => {
         return crypto.randomUUID();
     },
 
     getUserByToken: (token: string) => {
-        return db.query("SELECT id, username, role FROM users WHERE token = ?").get(token) as { id: string, username: string, role: string } | null;
+        return db.query("SELECT id, username, role FROM users WHERE token = ?").get(token) as SessionUser | null;
     }
 };
 
+/** Session token comes from the HttpOnly cookie, or the x-auth-token header as a fallback. */
+export function getTokenFromRequest(c: { cookie?: any, request: Request }): string | null {
+    const cookieToken = c.cookie?.auth_token?.value;
+    if (typeof cookieToken === 'string' && cookieToken) return cookieToken;
+    return c.request.headers.get("x-auth-token");
+}
+
+export function getUserFromRequest(c: { cookie?: any, request: Request }): SessionUser | null {
+    const token = getTokenFromRequest(c);
+    if (!token) return null;
+    return AuthUtils.getUserByToken(token);
+}
+
 // @ts-ignore
 export function authMiddleware(c: Context) {
-    // Check for token in Cookie or Header
-    // @ts-ignore
-    const cookieToken = c.cookie?.auth_token?.value;
-    const headerToken = c.request.headers.get("x-auth-token");
-    const token = cookieToken || headerToken;
-
-    if (!token) {
-        c.set.status = 401;
-        return { error: "Unauthorized", message: "Missing Auth Token" };
-    }
-
-    const user = AuthUtils.getUserByToken(token as string);
+    const user = getUserFromRequest(c);
     if (!user) {
         c.set.status = 401;
-        return { error: "Unauthorized", message: "Invalid Session" };
+        return { error: "Unauthorized", message: "Missing or invalid auth token" };
     }
-
     // Attach user to context
     // @ts-ignore
     c.user = user;

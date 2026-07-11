@@ -10,7 +10,7 @@
     import HowToPlayModal from "../components/HowToPlayModal.svelte";
     import WhatsNewModal from "../components/WhatsNewModal.svelte"; // Added
     import Button from "../components/UI/Button.svelte";
-    import { authStore, logout } from "../lib/stores/auth";
+    import { authStore, oidcEnabled, logout } from "../lib/stores/auth";
     import { HelpCircle, Star, Zap, Trash2 } from "lucide-svelte";
 
     import { onMount, onDestroy } from "svelte";
@@ -304,7 +304,7 @@
                         <Trash2 size={16} />
                     </button>
                 </div>
-            {:else}
+            {:else if $oidcEnabled}
                 <Button
                     variant="ghost"
                     size="sm"
