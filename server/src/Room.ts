@@ -4,7 +4,10 @@ import { db } from './db'; // Added db import
 
 const topicManager = new TopicManager();
 
-const MAX_PLAYERS = 10;
+// 9 colors available, so 8 players always leaves a free color to swap to
+const MAX_PLAYERS = 8;
+// Deck is 1-100; a run is over when the next level cannot be dealt anyway
+const MAX_LEVEL = 10;
 
 export class Room {
     public code: string;
@@ -16,8 +19,7 @@ export class Room {
     public version: number = 0;
     public level: number = 1;
     private deck: number[] = [];
-    private hands: Map<string, Card[]> = new Map();
-    private readyPlayers: Set<string> = new Set();
+    public hands: Map<string, Card[]> = new Map();
     public activePackId: string = "starter_pack";
     public activePackName: string = "The Essentials";
     public roundResult: 'WIN' | 'LOSS' | null = null;
@@ -35,7 +37,7 @@ export class Room {
 
     addPlayer(id: string, name: string, ws: any): Player {
         if (this.players.length >= MAX_PLAYERS) {
-            throw new Error("Room is full (Max 8 players)");
+            throw new Error(`Room is full (Max ${MAX_PLAYERS} players)`);
         }
 
         // Pick a random color not currently used
@@ -112,10 +114,7 @@ export class Room {
             clearTimeout(player.disconnectTimeout);
         }
 
-        // If removed player had a vote, should we keep it? 
-        // User request: "checks and proceed with the majority".
-        // This implies we re-evaluate immediately.
-        // It's safer to remove their vote so they don't count towards the total.
+        // Drop their vote so it no longer counts towards the total
         this.votes.delete(id);
 
         this.players = this.players.filter(p => p.id !== id);
@@ -163,21 +162,11 @@ export class Room {
         // Notify everyone
         this.broadcast({ type: 'PLAYER_KICKED', payload: { playerId: targetId } });
 
-        // Close victim's socket if connected
+        // Tell the victim; keep their socket open so they land back on the home screen
         if (target.ws && target.ws.readyState === 1) {
             target.ws.send(JSON.stringify({ type: 'KICKED', payload: null }));
-            // Do NOT close socket, so they can return to Landing without reconnecting loop
-            // target.ws.close();
         }
 
-        // Return cards to deck or just discard them?
-        // Logic: if game is playing, their cards in hand are lost.
-        // Cards on board should be removed?
-        // Currently removePlayer just removes the player. 
-        // Board cards remain but might look weird if owner is gone?
-        // Actually removePlayer loop (lines 101) just filters player.
-
-        // Let's check removePlayer logic.
         this.removePlayer(targetId);
 
         // Broadcast new state
@@ -185,6 +174,12 @@ export class Room {
     }
 
     // --- Game Logic ---
+
+    /** Highest playable level: capped by MAX_LEVEL and by the 100-card deck. */
+    finalLevel(): number {
+        const playerCount = Math.max(this.players.length, 1);
+        return Math.min(MAX_LEVEL, Math.floor(100 / playerCount));
+    }
 
     startGame() {
         if (this.players.length < 2) return;
@@ -194,7 +189,6 @@ export class Room {
         this.hands.clear();
         this.version = 0; // Reset version on game start
         this.board = []; // Reset board
-        this.readyPlayers.clear();
         this.votes.clear(); // Reset voting
         this.roundResult = null; // Reset result
 
@@ -261,17 +255,6 @@ export class Room {
 
         // Also broadcast generic room update so lobby UI switches
         this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
-    }
-
-    handleReady(playerId: string) {
-        this.readyPlayers.add(playerId);
-        this.broadcast({ type: 'ROOM_UPDATED', payload: this.getState() });
-
-        // Check if all players are ready
-        if (this.readyPlayers.size === this.players.length) {
-            console.log(`[Room ${this.code}] All players ready! Starting Round (Level ${this.level})`);
-            this.startGame();
-        }
     }
 
     broadcast(message: WsResponse) {
@@ -366,10 +349,11 @@ export class Room {
         if (currentIndex === -1) {
             // Find in hands
             let foundInHand = false;
-            for (const [playerId, hand] of this.hands.entries()) {
+            for (const hand of this.hands.values()) {
                 const handIndex = hand.findIndex(c => c.id === cardId);
                 if (handIndex !== -1) {
                     const [card] = hand.splice(handIndex, 1);
+                    if (!card) break;
                     // Add to board at targetIndex
                     this.board.splice(targetIndex, 0, card);
                     foundInHand = true;
@@ -383,6 +367,7 @@ export class Room {
         } else {
             // Move within board
             const [card] = this.board.splice(currentIndex, 1);
+            if (!card) return;
             if (card.isFaceUp) {
                 console.warn(`Attempt to move revealed card ${cardId}`);
                 // Revert
@@ -445,24 +430,12 @@ export class Room {
             return;
         }
 
-        // Check hands
-        for (const [playerId, hand] of this.hands.entries()) {
+        // Cards in hand are private: save the note server-side so it travels
+        // with the card when played; the owner's client already shows it locally.
+        for (const hand of this.hands.values()) {
             const cardInHand = hand.find(c => c.id === cardId);
             if (cardInHand) {
                 cardInHand.note = note;
-                // Only notify the owner? Or everyone?
-                // If it's in hand, it's private.
-                // But if they play it later, the note travels with it.
-                // We need to update the owner's hand state.
-                const player = this.players.find(p => p.id === playerId);
-                if (player && player.ws && player.ws.readyState === 1) {
-                    // We don't have a specific HAND_UPDATED message, but GAME_STARTED sends hand.
-                    // Or we can just rely on the fact that the client might not show notes in hand?
-                    // Let's just broadcast ROOM_UPDATED, but hand info is sanitized in getState.
-                    // We need to send the specific player their new hand?
-                    // Actually, usually client handles local note update for hand.
-                    // But let's save it on server so it persists.
-                }
                 return;
             }
         }
@@ -526,17 +499,28 @@ export class Room {
             const allRevealed = this.board.every(c => c.isFaceUp);
             if (allRevealed) {
                 // Check if sorted
-                const isSorted = this.board.every((c, i, arr) => i === 0 || c.value >= arr[i - 1].value);
+                const isSorted = this.board.every((c, i, arr) => i === 0 || c.value >= arr[i - 1]!.value);
 
                 if (isSorted) {
                     console.log("✅ SUCCESS: All cards revealed in ascending order!");
+                    this.logResult('WIN');
+                    this.votes.clear();
+
+                    // Beating the final level ends the whole run
+                    if (this.level >= this.finalLevel()) {
+                        console.log(`[Room ${this.code}] 🏆 Final level ${this.level} cleared. Game complete!`);
+                        this.gameState = 'GAME_COMPLETE';
+                        this.roundResult = 'WIN';
+                        this.broadcast({
+                            type: 'GAME_COMPLETE',
+                            payload: { board: this.board, level: this.level }
+                        });
+                        return;
+                    }
+
                     this.gameState = 'ROUND_END';
                     this.roundResult = 'WIN';
-                    this.logResult('WIN');
-                    this.votes.clear(); // Clear old votes just in case
-                    // this.level++; // Incremented now only after Voting!
-                    // REMOVED: this.level++;
-
+                    // Level increments only after the NEXT/RETRY vote resolves
                     this.broadcast({
                         type: 'ROUND_ENDED',
                         payload: { result: 'WIN', board: this.board }
@@ -578,7 +562,6 @@ export class Room {
             topic: this.topic,
             version: this.version,
             level: this.level,
-            readyCount: this.readyPlayers.size,
             activePackName: this.activePackName,
             activePackId: this.activePackId,
             roundResult: this.roundResult || undefined,

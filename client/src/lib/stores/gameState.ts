@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { Player, GameStatus, RoomState, GameState as GameStateInterface, Card, BoardSlot } from '../types';
+import type { RoomState, GameState as GameStateInterface, Card } from '../types';
 
 // Use the GameState interface from types.ts, or defining a generic Store type
 type GameStore = GameStateInterface;
@@ -16,7 +16,6 @@ const initialState: GameStore = {
     error: null,
     level: 1,
     roundResult: null,
-    readyCount: 0,
     lastRoundLevel: 1,
     votes: {}
 };
@@ -37,7 +36,6 @@ function createGameState() {
                 board: state.board || [],
                 topic: state.topic,
                 level: state.level,
-                readyCount: state.readyCount,
                 activePackName: state.activePackName,
                 activePackId: state.activePackId,
                 roundResult: state.roundResult || s.roundResult,
@@ -48,6 +46,7 @@ function createGameState() {
         setBoard: (board: Card[]) => update(s => ({ ...s, board })),
         setError: (error: string) => update(s => ({ ...s, error })),
         setRoundResult: (result: 'WIN' | 'LOSS', board: Card[]) => update(s => ({ ...s, gameState: 'ROUND_END', roundResult: result, board, lastRoundLevel: s.level, votes: {} })),
+        setGameComplete: (board: Card[], level: number) => update(s => ({ ...s, gameState: 'GAME_COMPLETE', roundResult: 'WIN', board, lastRoundLevel: level, votes: {} })),
         updateVotes: (votes: Record<string, 'RETRY' | 'NEXT'>) => update(s => ({ ...s, votes })),
         setFullState: (state: RoomState, hand: Card[], playerId: string) => update(s => ({
             ...s,
@@ -56,7 +55,6 @@ function createGameState() {
             board: state.board || [],
             topic: state.topic,
             level: state.level,
-            readyCount: state.readyCount,
             hand: hand,
             roomCode: state.code,
             playerId: playerId,

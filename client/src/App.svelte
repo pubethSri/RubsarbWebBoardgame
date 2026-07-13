@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { socketStore } from "./lib/stores/socket";
   import { gameState } from "./lib/stores/gameState";
-  import { checkSession, checkSilentSession, authStore } from "./lib/stores/auth";
+  import { checkSession, fetchAuthConfig } from "./lib/stores/auth";
   import Landing from "./views/Landing.svelte";
   import Lobby from "./views/Lobby.svelte";
   import Game from "./views/Game.svelte";
@@ -16,13 +16,7 @@
     socketStore.connect(`${protocol}//${host}/ws`);
 
     // Check for Session via HttpOnly Cookie (Server validates)
-    const isLoggedIn = await checkSession();
-    if (!isLoggedIn) {
-      if (!sessionStorage.getItem("silent_auth_checked")) {
-        checkSilentSession();
-        return; // Halt initialization, UI will redirect shortly
-      }
-    }
+    await Promise.all([fetchAuthConfig(), checkSession()]);
     isInitializing = false;
   });
 </script>

@@ -8,14 +8,18 @@
         finalBoard: Card[];
         topic: Topic | null;
         level: number;
-        readyCount: number;
         playerCount: number;
+        gameComplete?: boolean;
     }
 
-    let { result, finalBoard, topic, level, readyCount, playerCount }: Props =
-        $props();
-
-    let isReady = $state(false);
+    let {
+        result,
+        finalBoard,
+        topic,
+        level,
+        playerCount,
+        gameComplete = false,
+    }: Props = $props();
 
     function getPlayerName(playerId: string) {
         return (
@@ -27,13 +31,6 @@
         return (
             $gameState.players.find((p) => p.id === playerId)?.color || "#000"
         );
-    }
-
-    function sendReady() {
-        if (!isReady) {
-            isReady = true;
-            socketStore.sendMessage({ type: "PLAYER_READY", payload: null });
-        }
     }
 
     import { scale, fly } from "svelte/transition";
@@ -72,6 +69,22 @@
             >
                 Everyone left...
             </p>
+        {:else if gameComplete}
+            <div class="relative">
+                <h1
+                    class="text-6xl md:text-8xl font-black font-mono uppercase mb-2 text-primary-blue drop-shadow-[4px_4px_0px_#000000]"
+                >
+                    YOU WIN!
+                </h1>
+                <p
+                    class="text-3xl font-black uppercase tracking-widest bg-black text-white inline-block px-4 py-1 border-4 border-white rotate-[-2deg]"
+                >
+                    All {level} Levels Cleared
+                </p>
+                <p class="mt-4 text-lg font-bold font-mono uppercase">
+                    Your minds are perfectly in sync 🧠
+                </p>
+            </div>
         {:else if result === "WIN"}
             <div class="relative">
                 <h1
@@ -151,7 +164,18 @@
 
     <!-- Actions -->
     <div class="flex flex-col items-center gap-6 w-full max-w-2xl z-10 mt-8">
-        {#if playerCount < 2}
+        {#if gameComplete}
+            <div class="w-72">
+                <Button
+                    size="lg"
+                    fullWidth
+                    variant="primary"
+                    onclick={leaveRoom}
+                >
+                    BACK TO HOME
+                </Button>
+            </div>
+        {:else if playerCount < 2}
             <div class="w-72">
                 <Button
                     size="lg"
@@ -249,17 +273,24 @@
                 </div>
             {/if}
         {:else}
-            <!-- LOSS: Simple Ready to Retry -->
+            <!-- LOSS: everyone votes RETRY to restart the same level -->
+            {@const myId = $gameState.playerId || ""}
+            {@const hasVoted = !!$gameState.votes[myId]}
+            {@const voteCount = Object.keys($gameState.votes).length}
             <div class="w-full max-w-sm flex flex-col gap-4">
                 <Button
                     size="lg"
                     fullWidth
                     variant="secondary"
-                    onclick={sendReady}
-                    disabled={isReady}
+                    onclick={() =>
+                        socketStore.sendMessage({
+                            type: "VOTE",
+                            payload: { vote: "RETRY" },
+                        })}
+                    disabled={hasVoted}
                 >
-                    {#if isReady}
-                        WAITING... ({readyCount}/{playerCount})
+                    {#if hasVoted}
+                        WAITING... ({voteCount}/{playerCount})
                     {:else}
                         RETRY LEVEL {level}
                     {/if}
@@ -267,15 +298,17 @@
             </div>
         {/if}
 
-        <Button
-            variant="ghost"
-            class={result === "LOSS"
-                ? "text-white hover:bg-white/10 hover:border-white border-white w-48"
-                : "w-48"}
-            onclick={leaveRoom}
-        >
-            LEAVE ROOM
-        </Button>
+        {#if !gameComplete}
+            <Button
+                variant="ghost"
+                class={result === "LOSS"
+                    ? "text-white hover:bg-white/10 hover:border-white border-white w-48"
+                    : "w-48"}
+                onclick={leaveRoom}
+            >
+                LEAVE ROOM
+            </Button>
+        {/if}
     </div>
 </div>
 

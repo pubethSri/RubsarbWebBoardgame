@@ -1,287 +1,238 @@
 import { Elysia } from "elysia";
 import { RoomManager } from './RoomManager';
+import type { Room } from './Room';
 import type { WsMessage } from './types';
 import { db, initDB } from './db';
 import { migrate } from './db/migrate';
-import { seedUsers } from './db/seed_users';
 import { rateLimit } from './middleware/rateLimit';
-// import { adminAuth } from './middleware/adminAuth';
-// import { creatorAuth } from './middleware/creatorAuth';
-import { AuthUtils, authMiddleware } from './auth';
+import { AuthUtils, authMiddleware, getUserFromRequest } from './auth';
 import { AuthentikService } from './services/authentik';
-import * as jose from 'jose';
-import { staticPlugin } from "@elysiajs/static";
 import { CreatePackSchema } from './schemas/topic';
 
-const authentikService = new AuthentikService();
+// OIDC is optional: without it the game runs fully anonymous,
+// only pack creation and the admin dashboard need a login.
+const authentikService = AuthentikService.fromEnv();
 
 // Initialize Database & Run Migrations
 initDB();
 await migrate();
-await seedUsers();
 
 const roomManager = new RoomManager();
 
 const activeSessions = new Map<string, { roomId: string, playerId: string }>();
 
+// Built frontend location, relative to the server working directory.
+// Works for local dev (repo layout) and Docker (WORKDIR /app/server, dist at /app/client/dist).
+const CLIENT_DIST = "../client/dist";
+
+/** Stores the session + notifies everyone. Shared by CREATE_ROOM / JOIN_ROOM. */
+function completeJoin(ws: any, room: Room, player: { id: string, token: string }) {
+    activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
+    ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
+    room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+}
+
+/** Resolves the sender's room (and player) or null when there is no session. */
+function getSessionContext(ws: any): { room: Room, playerId: string } | null {
+    const session = activeSessions.get(ws.id);
+    if (!session) return null;
+    const room = roomManager.getRoom(session.roomId);
+    if (!room) return null;
+    return { room, playerId: session.playerId };
+}
+
+/**
+ * Creates/updates the local user row after a successful OIDC login and
+ * returns the new session token. Usernames are unique; on a collision with
+ * a different account we retry once with a suffix.
+ */
+function upsertOidcUser(userInfo: { sub: string, preferred_username: string, groups: string[] }, idToken: string | undefined): string {
+    const role = authentikService!.mapGroupsToRole(userInfo.groups);
+    const token = AuthUtils.createToken();
+
+    const upsert = db.prepare(`
+        INSERT INTO users (id, username, role, token, id_token)
+        VALUES ($id, $username, $role, $token, $id_token)
+        ON CONFLICT(id) DO UPDATE SET
+            username = $username,
+            role = $role,
+            token = $token,
+            id_token = $id_token
+    `);
+
+    const params = {
+        $id: userInfo.sub,
+        $username: userInfo.preferred_username,
+        $role: role,
+        $token: token,
+        $id_token: idToken || null
+    };
+
+    try {
+        upsert.run(params);
+    } catch (e: any) {
+        if (!e.message?.includes("UNIQUE constraint failed: users.username")) throw e;
+        console.log(`⚠️ Username collision for ${userInfo.preferred_username}. Retrying with suffix...`);
+        upsert.run({ ...params, $username: `${userInfo.preferred_username} (${userInfo.sub.slice(0, 6)})` });
+    }
+
+    return token;
+}
+
+function setAuthCookie(cookie: any, token: string) {
+    cookie?.auth_token?.set({
+        value: token,
+        httpOnly: true,
+        path: '/',
+        maxAge: 7 * 86400, // 7 Days
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+    });
+}
+
 const app = new Elysia()
-    // Serve Static Assets Manually (Docker specific fix)
-    .get("/assets/*", ({ params }) => {
-        const filePath = process.env.NODE_ENV === 'production'
-            ? `/app/client/dist/assets/${params['*']}`
-            : `../client/dist/assets/${params['*']}`;
-        return Bun.file(filePath);
-    })
-    .get("/index.html", () => {
-        const filePath = process.env.NODE_ENV === 'production'
-            ? `/app/client/dist/index.html`
-            : `../client/dist/index.html`;
-        return Bun.file(filePath);
-    })
-    .get("/", () => {
-        const filePath = process.env.NODE_ENV === 'production'
-            ? `/app/client/dist/index.html`
-            : `../client/dist/index.html`;
-        return Bun.file(filePath);
-    })
+    // --- Static frontend (SPA) ---
+    .get("/assets/*", ({ params }) => Bun.file(`${CLIENT_DIST}/assets/${params['*']}`))
+    .get("/", () => Bun.file(`${CLIENT_DIST}/index.html`))
+    .get("/index.html", () => Bun.file(`${CLIENT_DIST}/index.html`))
+
     .ws('/ws', {
         idleTimeout: 3600, // 1 Hour
         open(ws) {
             console.log('✨ Client connected:', ws.id);
         },
         message(ws, message: any) {
-            // Parse message if it's a string, otherwise cast it
             const msg: WsMessage = typeof message === 'string' ? JSON.parse(message) : message;
             const session = activeSessions.get(ws.id);
             const prefix = session ? `[Room ${session.roomId}] ` : `[Unknown] `;
-            console.log(`${prefix}📩 Received:`, msg);
+            console.log(`${prefix}📩 Received:`, msg.type);
 
             if (msg.type === 'CREATE_ROOM') {
                 const room = roomManager.createRoom();
                 const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
-
-                // Store session in local Map
-                activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
-
-                ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
-                room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
-            }
-
-            if (msg.type === 'MOVE_CARD') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        const { cardId, targetIndex } = msg.payload;
-                        room.moveCard(cardId, targetIndex);
-                    }
-                }
-            }
-
-            if (msg.type === 'RETURN_CARD') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        room.returnCard(msg.payload.cardId);
-                    }
-                }
-            }
-
-            if (msg.type === 'UPDATE_NOTE') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        const { cardId, note } = msg.payload;
-                        room.updateNote(cardId, note);
-                    }
-                }
+                completeJoin(ws, room, player);
+                return;
             }
 
             if (msg.type === 'JOIN_ROOM') {
                 const room = roomManager.getRoom(msg.payload.roomCode);
-                if (room) {
-                    try {
-                        const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
-
-                        // Store session in local Map
-                        activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
-
-                        ws.send(JSON.stringify({ type: 'JOINED_ROOM', payload: { code: room.code, playerId: player.id, token: player.token } }));
-                        room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
-                    } catch (e: any) {
-                        ws.send(JSON.stringify({ type: 'ERROR', payload: { message: e.message || 'Failed to join room' } }));
-                    }
-                } else {
+                if (!room) {
                     ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Room not found' } }));
+                    return;
                 }
-            }
-
-            if (msg.type === 'LEAVE_ROOM') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const { roomId, playerId } = session;
-                    const room = roomManager.getRoom(roomId);
-                    if (room) {
-                        room.removePlayer(playerId);
-                        console.log(`🚪 Player ${playerId} manually left room ${roomId}`);
-                        if (room.players.length === 0) {
-                            roomManager.removeRoom(roomId);
-                        } else {
-                            room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
-                        }
-                    }
-                    activeSessions.delete(ws.id);
+                try {
+                    const player = room.addPlayer(ws.id, msg.payload.playerName, ws);
+                    completeJoin(ws, room, player);
+                } catch (e: any) {
+                    ws.send(JSON.stringify({ type: 'ERROR', payload: { message: e.message || 'Failed to join room' } }));
                 }
-            }
-
-            if (msg.type === 'START_GAME') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const { roomId, playerId } = session;
-                    const room = roomManager.getRoom(roomId);
-                    if (room) {
-                        // verify host
-                        const player = room.players.find(p => p.id === playerId);
-                        if (player && player.isHost) {
-                            room.startGame();
-                            console.log(`🎮 Game started in room ${roomId} by ${playerId}`);
-                        }
-                    }
-                }
-            }
-
-            if (msg.type === 'UPDATE_BOARD') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        // Ideally validate that the move is legal (player owns the card?)
-                        // For Iteration 2 prototype: Trust client for DnD sync
-                        room.updateBoard(msg.payload.board);
-                    }
-                }
-            }
-
-            if (msg.type === 'REVEAL_NEXT') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const player = roomManager.getRoom(session.roomId)?.players.find(p => p.id === session.playerId);
-                    if (player && player.isHost) {
-                        const room = roomManager.getRoom(session.roomId);
-                        // @ts-ignore
-                        room.revealNext();
-                    }
-                }
-            }
-
-            if (msg.type === 'PLAYER_READY') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        room.handleReady(session.playerId);
-                    }
-                }
-            }
-
-            if (msg.type === 'CHANGE_COLOR') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        room.changeColor(session.playerId, msg.payload.color);
-                    }
-                }
-            }
-
-            if (msg.type === 'KICK_PLAYER') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        room.kickPlayer(msg.payload.playerId, session.playerId);
-                    }
-                }
-            }
-
-            if (msg.type === 'VOTE') {
-                const session = activeSessions.get(ws.id);
-                if (session) {
-                    const room = roomManager.getRoom(session.roomId);
-                    if (room) {
-                        room.handleVote(session.playerId, msg.payload.vote);
-                    }
-                }
+                return;
             }
 
             if (msg.type === 'RECONNECT') {
                 const room = roomManager.getRoom(msg.payload.roomId);
-                if (room) {
-                    const player = room.reconnectPlayer(msg.payload.token, ws);
-                    if (player) {
-                        console.log(`♻️ Player ${player.name} reconnected to room ${room.code}`);
-
-                        // Register Session
-                        activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
-
-                        // Send Welcome Back
-                        ws.send(JSON.stringify({
-                            type: 'WELCOME_BACK',
-                            payload: {
-                                gameState: room.getState(),
-                                // @ts-ignore
-                                hand: room.hands.get(player.id) || []
-                            }
-                        }));
-                    } else {
-                        ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Session expired or invalid token' } }));
-                    }
-                } else {
+                if (!room) {
                     ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Room not found' } }));
+                    return;
                 }
+                const player = room.reconnectPlayer(msg.payload.token, ws);
+                if (!player) {
+                    ws.send(JSON.stringify({ type: 'ERROR', payload: { message: 'Session expired or invalid token' } }));
+                    return;
+                }
+                console.log(`♻️ Player ${player.name} reconnected to room ${room.code}`);
+                activeSessions.set(ws.id, { roomId: room.code, playerId: player.id });
+                ws.send(JSON.stringify({
+                    type: 'WELCOME_BACK',
+                    payload: {
+                        gameState: room.getState(),
+                        hand: room.hands.get(player.id) || []
+                    }
+                }));
+                return;
+            }
+
+            // Everything below requires an active session in a live room
+            const ctx = getSessionContext(ws);
+            if (!ctx) return;
+            const { room, playerId } = ctx;
+            const isHost = () => room.players.find(p => p.id === playerId)?.isHost === true;
+
+            switch (msg.type) {
+                case 'LEAVE_ROOM':
+                    room.removePlayer(playerId);
+                    console.log(`🚪 Player ${playerId} manually left room ${room.code}`);
+                    if (room.players.length > 0) {
+                        room.broadcast({ type: 'ROOM_UPDATED', payload: room.getState() });
+                    }
+                    activeSessions.delete(ws.id);
+                    break;
+
+                case 'START_GAME':
+                    if (isHost()) {
+                        room.startGame();
+                        console.log(`🎮 Game started in room ${room.code} by ${playerId}`);
+                    }
+                    break;
+
+                case 'MOVE_CARD':
+                    room.moveCard(msg.payload.cardId, msg.payload.targetIndex);
+                    break;
+
+                case 'RETURN_CARD':
+                    room.returnCard(msg.payload.cardId);
+                    break;
+
+                case 'UPDATE_NOTE':
+                    room.updateNote(msg.payload.cardId, msg.payload.note);
+                    break;
+
+                case 'REVEAL_NEXT':
+                    if (isHost()) room.revealNext();
+                    break;
+
+                case 'CHANGE_COLOR':
+                    room.changeColor(playerId, msg.payload.color);
+                    break;
+
+                case 'KICK_PLAYER':
+                    room.kickPlayer(msg.payload.playerId, playerId);
+                    break;
+
+                case 'VOTE':
+                    room.handleVote(playerId, msg.payload.vote);
+                    break;
             }
         },
         close(ws) {
             const session = activeSessions.get(ws.id);
-
-            if (session) {
-                const { roomId, playerId } = session;
-                console.log(`🔌 Disconnect event for player ${playerId} in room ${roomId}`);
-
-                const room = roomManager.getRoom(roomId);
-                if (room) {
-                    // room.removePlayer(playerId);
-                    room.handleDisconnect(playerId);
-                    console.log(`❌ Player ${playerId} disconnected (Grace period started)`);
-
-                    // Clean up room only if EVERYONE is gone (no one active)
-                    const activePlayers = room.players.filter(p => p.isConnected);
-                    if (room.players.length === 0 || (activePlayers.length === 0 && room.players.length === 0)) {
-                        // Actually, we should probably keep the room alive if people are in grace period?
-                        // For now, let's keep it simple: If players array empty -> delete.
-                        // But wait, handleDisconnect doesn't remove from array.
-                        // So checking room.players.length is correct to keep it alive.
-                    }
-                    // We rely on the timer in Room.ts to eventually removePlayer -> which might empty the room.
-                    // Accessing room manager from here to delete empty room might be tricky if done inside Room.ts
-                    // But for now, we just don't delete immediately on disconnect.
-                }
-                // Cleanup session
-                activeSessions.delete(ws.id);
-            } else {
+            if (!session) {
                 console.log(`⚠️ Unknown client disconnected (id: ${ws.id})`);
+                return;
             }
+
+            const { roomId, playerId } = session;
+            const room = roomManager.getRoom(roomId);
+            if (room) {
+                // Don't remove the player yet: Room starts a grace-period timer
+                // and removes them itself if they never reconnect.
+                room.handleDisconnect(playerId);
+                console.log(`❌ Player ${playerId} disconnected (Grace period started)`);
+            }
+            activeSessions.delete(ws.id);
         }
     })
 
     .group("/api/auth", app => app
-        .get("/login/authentik", () => {
-            const url = authentikService.getAuthorizationUrl();
-            return Response.redirect(url);
+        // Lets the client know whether to render the login UI at all
+        .get("/config", () => ({ oidcEnabled: authentikService !== null }))
+        .get("/login/authentik", ({ set }) => {
+            if (!authentikService) { set.status = 503; return "OIDC is not configured"; }
+            return Response.redirect(authentikService.getAuthorizationUrl());
         })
         .get("/callback/authentik", async ({ query, set, cookie }) => {
+            if (!authentikService) { set.status = 503; return "OIDC is not configured"; }
+
             const code = query.code as string;
             if (!code) {
                 set.status = 400;
@@ -293,250 +244,46 @@ const app = new Elysia()
                 set.status = 401;
                 return "Failed to retrieve Access Token from Authentik";
             }
-            const { access_token, id_token } = tokenResponse;
 
-            const userInfo = await authentikService.getUserInfo(access_token);
+            const userInfo = await authentikService.getUserInfo(tokenResponse.access_token);
             if (!userInfo) {
                 set.status = 500;
                 return "Failed to retrieve User Info from Authentik";
             }
 
-            // Map Roles
-            const role = authentikService.mapGroupsToRole(userInfo.groups);
-
-            // Generate Session Token
-            const token = AuthUtils.createToken();
-
-            // Upsert User
             try {
-                const upsert = db.prepare(`
-                    INSERT INTO users (id, username, role, token, id_token) 
-                    VALUES ($id, $username, $role, $token, $id_token)
-                    ON CONFLICT(id) DO UPDATE SET
-                        username = $username,
-                        role = $role,
-                        token = $token,
-                        id_token = $id_token
-                `);
-
-                upsert.run({
-                    $id: userInfo.sub,
-                    $username: userInfo.preferred_username,
-                    $role: role,
-                    $token: token,
-                    $id_token: id_token || null
-                });
-
-                // Set HttpOnly Cookie
-                // @ts-ignore
-                if (cookie && cookie.auth_token) {
-                    // @ts-ignore
-                    cookie.auth_token.set({
-                        value: token,
-                        httpOnly: true,
-                        path: '/',
-                        maxAge: 7 * 86400, // 7 Days
-                        sameSite: 'lax',
-                        secure: process.env.NODE_ENV === 'production'
-                    });
-                }
-
-                // Redirect to Frontend (Clean URL)
+                const token = upsertOidcUser(userInfo, tokenResponse.id_token);
+                setAuthCookie(cookie, token);
                 return Response.redirect('/');
             } catch (e: any) {
-                // Handle Username Collision for parallel testing
-                if (e.message && e.message.includes("UNIQUE constraint failed: users.username")) {
-                    console.log(`⚠️ Authentik Username Collision for ${userInfo.preferred_username}. Retrying with suffix...`);
-                    try {
-                        const retryUpsert = db.prepare(`
-                            INSERT INTO users (id, username, role, token, id_token) 
-                            VALUES ($id, $username, $role, $token, $id_token)
-                            ON CONFLICT(id) DO UPDATE SET
-                                username = $username,
-                                role = $role,
-                                token = $token,
-                                id_token = $id_token
-                        `);
-
-                        retryUpsert.run({
-                            $id: userInfo.sub,
-                            $username: `${userInfo.preferred_username} (Authentik)`,
-                            $role: role,
-                            $token: token,
-                            $id_token: id_token || null
-                        });
-
-                        // Set HttpOnly Cookie (Repeated for success path)
-                        // @ts-ignore
-                        if (cookie && cookie.auth_token) {
-                            // @ts-ignore
-                            cookie.auth_token.set({
-                                value: token,
-                                httpOnly: true,
-                                path: '/',
-                                maxAge: 7 * 86400, // 7 Days
-                                sameSite: 'lax',
-                                secure: process.env.NODE_ENV === 'production'
-                            });
-                        }
-                        return Response.redirect('/');
-
-                    } catch (retryError: any) {
-                        console.error("DB Error during Authentik login retry:", retryError);
-                        set.status = 500;
-                        return `Internal Database Error (Retry Failed): ${retryError.message}`;
-                    }
-                }
-
                 console.error("DB Error during login:", e);
                 set.status = 500;
                 return `Internal Database Error: ${e.message}`;
-            }
-        })
-        .get("/login/authentik/silent", () => {
-            const url = authentikService.getSilentAuthorizationUrl();
-            return Response.redirect(url);
-        })
-        .get("/callback/authentik/silent", async ({ query, set, cookie }) => {
-            const error = query.error as string;
-            if (error) {
-                return Response.redirect('/');
-            }
-
-            const code = query.code as string;
-            if (!code) {
-                return Response.redirect('/?error=no_code');
-            }
-
-            const redirectUri = authentikService.getSilentRedirectUri();
-            const tokenResponse = await authentikService.getToken(code, redirectUri);
-            
-            if (!tokenResponse) {
-                return Response.redirect('/?error=token_exchange_failed');
-            }
-            const { access_token, id_token } = tokenResponse;
-
-            const userInfo = await authentikService.getUserInfo(access_token);
-            if (!userInfo) {
-                return Response.redirect('/?error=userinfo_failed');
-            }
-
-            const role = authentikService.mapGroupsToRole(userInfo.groups);
-            const token = AuthUtils.createToken();
-
-            try {
-                const upsert = db.prepare(`
-                    INSERT INTO users (id, username, role, token, id_token) 
-                    VALUES ($id, $username, $role, $token, $id_token)
-                    ON CONFLICT(id) DO UPDATE SET
-                        username = $username,
-                        role = $role,
-                        token = $token,
-                        id_token = $id_token
-                `);
-
-                upsert.run({
-                    $id: userInfo.sub,
-                    $username: userInfo.preferred_username,
-                    $role: role,
-                    $token: token,
-                    $id_token: id_token || null
-                });
-
-                // @ts-ignore
-                if (cookie && cookie.auth_token) {
-                    // @ts-ignore
-                    cookie.auth_token.set({
-                        value: token,
-                        httpOnly: true,
-                        path: '/',
-                        maxAge: 7 * 86400, // 7 Days
-                        sameSite: 'lax',
-                        secure: process.env.NODE_ENV === 'production'
-                    });
-                }
-
-                return Response.redirect('/');
-            } catch (e: any) {
-                if (e.message && e.message.includes("UNIQUE constraint failed: users.username")) {
-                    console.log(`⚠️ Authentik Username Collision for ${userInfo.preferred_username}. Retrying with suffix...`);
-                    try {
-                        const retryUpsert = db.prepare(`
-                            INSERT INTO users (id, username, role, token, id_token) 
-                            VALUES ($id, $username, $role, $token, $id_token)
-                            ON CONFLICT(id) DO UPDATE SET
-                                username = $username,
-                                role = $role,
-                                token = $token,
-                                id_token = $id_token
-                        `);
-
-                        retryUpsert.run({
-                            $id: userInfo.sub,
-                            $username: `${userInfo.preferred_username} (Authentik)`,
-                            $role: role,
-                            $token: token,
-                            $id_token: id_token || null
-                        });
-
-                        // @ts-ignore
-                        if (cookie && cookie.auth_token) {
-                            // @ts-ignore
-                            cookie.auth_token.set({
-                                value: token,
-                                httpOnly: true,
-                                path: '/',
-                                maxAge: 7 * 86400, // 7 Days
-                                sameSite: 'lax',
-                                secure: process.env.NODE_ENV === 'production'
-                            });
-                        }
-                        
-                        return Response.redirect('/');
-                    } catch (retryError: any) {
-                        console.error("DB Error during silent Authentik login retry:", retryError);
-                        return Response.redirect('/?error=db_error_retry');
-                    }
-                }
-
-                console.error("DB Error during silent login:", e);
-                return Response.redirect('/?error=db_error');
             }
         })
         .post("/logout", ({ query, cookie }) => {
             let redirectUrl: string | undefined;
             const isLocal = query.local === 'true';
 
-            // @ts-ignore
-            if (cookie && cookie.auth_token && cookie.auth_token.value) {
-                // @ts-ignore
-                const token = cookie.auth_token.value;
+            const token = cookie?.auth_token?.value;
+            if (typeof token === 'string' && token) {
                 const user = AuthUtils.getUserByToken(token);
 
-                // Get id_token from DB for hint (ONLY if not local logout)
-                if (user && !isLocal) {
-                    // @ts-ignore
-                    const dbUser = db.query("SELECT id_token FROM users WHERE id = ?").get(user.id) as { id_token: string };
-                    if (dbUser && dbUser.id_token) {
-                        try {
-                            // Decode to find issuer
-                            const claims = jose.decodeJwt(dbUser.id_token);
-                            if (claims.iss?.includes("authentik") || claims.iss?.includes("application/o/ito-app")) {
-                                redirectUrl = authentikService.getLogoutUrl(dbUser.id_token);
-                            }
-                        } catch (e) {
-                            console.error("Failed to decode id_token for logout:", e);
-                        }
+                // For a global logout, send the user to the IdP end-session endpoint
+                if (user && !isLocal && authentikService) {
+                    const dbUser = db.query("SELECT id_token FROM users WHERE id = ?").get(user.id) as { id_token: string } | null;
+                    if (dbUser?.id_token) {
+                        redirectUrl = authentikService.getLogoutUrl(dbUser.id_token);
                     }
                 }
 
-                // Clear Cookie
-                // @ts-ignore
-                cookie.auth_token.remove();
+                cookie.auth_token?.remove();
             }
             return { success: true, redirectUrl };
         })
         .post("/backchannel-logout", async ({ body, set }) => {
+            if (!authentikService) { set.status = 503; return "OIDC is not configured"; }
+
             const { logout_token } = body as { logout_token: string };
             if (!logout_token) {
                 set.status = 400;
@@ -551,7 +298,6 @@ const app = new Elysia()
 
             console.log(`🔌 Backchannel Logout received for sub: ${sub}`);
 
-            // Invalidate session (Clear token)
             try {
                 db.query("UPDATE users SET token = NULL, id_token = NULL WHERE id = ?").run(sub);
                 return "OK";
@@ -561,25 +307,15 @@ const app = new Elysia()
                 return "Internal Error";
             }
         })
-        .get("/me", ({ request, set, cookie }) => {
-            // Check Cookie first, then Header
-            // @ts-ignore
-            const cookieToken = cookie?.auth_token?.value;
-            const headerToken = request.headers.get("x-auth-token");
-            const token = typeof cookieToken === 'string' ? cookieToken : headerToken;
-
-            if (!token) { set.status = 401; return "No Token"; }
-            const user = AuthUtils.getUserByToken(token);
-            if (!user) { set.status = 401; return "Invalid Token"; }
+        .get("/me", (c) => {
+            const user = getUserFromRequest(c);
+            if (!user) { c.set.status = 401; return "Not logged in"; }
             return { username: user.username, role: user.role };
         })
     )
     .get("/api/packs/official", ({ set }) => {
         try {
-            const results = db.query(`
-                SELECT * FROM packs WHERE is_official = 1
-            `).all();
-            return results;
+            return db.query("SELECT * FROM packs WHERE is_official = 1").all();
         } catch (e) {
             set.status = 500;
             return "Database Error";
@@ -603,20 +339,16 @@ const app = new Elysia()
 
         try {
             const insertPack = db.prepare(`
-                INSERT INTO packs (id, name, author, is_official) VALUES (?, ?, ?, 0)
+                INSERT INTO packs (id, name, author, share_code, is_official) VALUES (?, ?, ?, ?, 0)
             `);
-            const updateShareCode = db.prepare("UPDATE packs SET share_code = ? WHERE id = ?");
-
             const insertTopic = db.prepare(`
                 INSERT INTO topics (id, pack_id, topic, type, min_label, max_label) VALUES (?, ?, ?, ?, ?, ?)
             `);
 
-            // Generate 6-char share code OUTSIDE transaction to be available for return
             const code = Math.random().toString(36).substring(2, 8).toUpperCase();
 
             const transaction = db.transaction(() => {
-                insertPack.run(packId, name, author);
-                updateShareCode.run(code, packId);
+                insertPack.run(packId, name, author, code);
 
                 for (const t of topics) {
                     insertTopic.run(
@@ -673,35 +405,25 @@ const app = new Elysia()
         }
     })
     .group("/api/admin", app => app
-        .derive(({ request }) => {
-            // Optional: shared derive logic
-        })
-        .guard({ beforeHandle: [authMiddleware] }, app => app
-            .onBeforeHandle(({ request, set, cookie }) => {
-                // Double check admin role
-                // @ts-ignore
-                const cookieToken = cookie?.auth_token?.value;
-                const headerToken = request.headers.get("x-auth-token");
-                const token = typeof cookieToken === 'string' ? cookieToken : headerToken;
-
-                // @ts-ignore
-                const user = AuthUtils.getUserByToken(token);
+        .guard({
+            beforeHandle: [(c: any) => {
+                const user = getUserFromRequest(c);
                 if (!user || (user.role !== 'ADMIN' && user.role !== 'CREATOR')) {
-                    set.status = 403;
+                    c.set.status = 403;
                     return "Admins or Creators only";
                 }
-            })
-            .get("/stats", ({ set }) => {
+            }]
+        }, app => app
+            .get("/stats", () => {
                 return roomManager.getStats();
             })
             .get("/history", ({ set }) => {
                 try {
-                    const logs = db.query(`
+                    return db.query(`
                         SELECT * FROM game_logs
                         ORDER BY created_at DESC
                         LIMIT 100
                     `).all();
-                    return logs;
                 } catch (e) {
                     set.status = 500;
                     return "Database Error";
@@ -710,14 +432,13 @@ const app = new Elysia()
             .get("/packs", ({ set }) => {
                 try {
                     // List all packs with topic count
-                    const packs = db.query(`
+                    return db.query(`
                         SELECT p.id, p.name, p.author, p.share_code, p.is_official, p.created_at, COUNT(t.id) as topic_count
                         FROM packs p
                         LEFT JOIN topics t ON p.id = t.pack_id
                         GROUP BY p.id
                         ORDER BY p.created_at DESC
                     `).all();
-                    return packs;
                 } catch (e) {
                     set.status = 500;
                     return "Database Error";
@@ -758,8 +479,7 @@ const app = new Elysia()
             })
             .get("/packs/:id/topics", ({ params: { id }, set }) => {
                 try {
-                    const topics = db.query("SELECT * FROM topics WHERE pack_id = ?").all(id);
-                    return topics;
+                    return db.query("SELECT * FROM topics WHERE pack_id = ?").all(id);
                 } catch (e) {
                     set.status = 500;
                     return "Database Error";
