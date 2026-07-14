@@ -5,16 +5,28 @@
     export let isOpen = false;
     export let onClose: () => void;
 
-    const CURRENT_VERSION = "1.3"; // Bumped for Pack Selection
+    const CURRENT_VERSION = "2.1"; // Bumped for UX/UI polish
 
     const PATCH_NOTES = [
+        {
+            version: "2.1",
+            date: "2026-07-14",
+            title: "UX / UI Polish",
+            features: [
+                "<b>Clearer Ordering:</b> Cards now fill the board left-to-right with a LOW → HIGH guide, so the ascending order is easy to follow even with lots of cards.",
+                "<b>Drop Preview:</b> A dashed slot shows exactly where your card will land as you drag it onto the board.",
+                "<b>Collapsible Hand:</b> Hide your hand with one tap to free up more of the board.",
+                "<b>Mobile-Friendly:</b> Cards and the topic panel now resize to fit phones and tablets.",
+                "<b>Readable Topics:</b> Short topics no longer squish the 1 / 100 scale labels together.",
+            ],
+        },
         {
             version: "1.3",
             date: "2025-01-25",
             title: "Content Update",
             features: [
-                "📚 <b>Pack Selection:</b> Hosts can now browse and select Official Packs directly in the lobby!",
-                "✨ <b>Lobby Upgrade:</b> Improved UI for managing game settings.",
+                "<b>Pack Selection:</b> Hosts can now browse and select Official Packs directly in the lobby!",
+                "<b>Lobby Upgrade:</b> Improved UI for managing game settings.",
             ],
         },
         {
@@ -22,9 +34,9 @@
             date: "2025-01-20",
             title: "Democracy Update",
             features: [
-                "🗳️ <b>Voting System:</b> Decide together! Vote to RETRY the current level or proceed to the NEXT LEVEL.",
-                "⚖️ <b>Tie-Breaker:</b> In case of a split vote, the Host has the final say.",
-                "🚫 <b>Host Kick:</b> Hosts can now remove players from the lobby.",
+                "<b>Voting System:</b> Decide together! Vote to RETRY the current level or proceed to the NEXT LEVEL.",
+                "<b>Tie-Breaker:</b> In case of a split vote, the Host has the final say.",
+                "<b>Host Kick:</b> Hosts can now remove players from the lobby.",
             ],
         },
         {
@@ -32,8 +44,8 @@
             date: "2025-01-15",
             title: "Quality of Life",
             features: [
-                "👀 <b>Ghost Mode:</b> Toggle card visibility for better streaming/casting experience.",
-                "🐛 <b>Bug Fixes:</b> Smoother gameplay and reliable reconnections.",
+                "<b>Ghost Mode:</b> Toggle card visibility for better streaming/casting experience.",
+                "<b>Bug Fixes:</b> Smoother gameplay and reliable reconnections.",
             ],
         },
     ];
