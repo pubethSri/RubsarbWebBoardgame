@@ -29,7 +29,7 @@
     // Added for WhatsNewModal
     let showPatchNotes = $state(false);
     let hasUnreadNotes = $state(false);
-    const CURRENT_VERSION = "1.2";
+    const CURRENT_VERSION = "2.1";
 
     // Showcase Animation State
     let demoColorIndex = $state(0);

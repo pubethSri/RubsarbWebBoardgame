@@ -2,7 +2,11 @@
     import { gameState } from "../lib/stores/gameState";
     import { socketStore } from "../lib/stores/socket";
     import CardComponent from "./Card.svelte";
-    import { dndzone, type DndEvent } from "svelte-dnd-action";
+    import {
+        dndzone,
+        SHADOW_ITEM_MARKER_PROPERTY_NAME,
+        type DndEvent,
+    } from "svelte-dnd-action";
     import { flip } from "svelte/animate";
     import type { Card } from "../lib/types";
     import { Eye, EyeOff } from "lucide-svelte";
@@ -113,8 +117,12 @@
 
     <!-- Active Drop Zone (The Board) -->
     <div
-        class="w-full min-h-[400px] border-4 border-black border-dashed bg-white flex flex-wrap justify-center content-start gap-4 p-4 md:p-8 transition-colors shadow-[8px_8px_0px_0px_#000000] relative"
-        use:dndzone={{ items: localBoard, flipDurationMs }}
+        class="w-full min-h-[400px] border-4 border-black border-dashed bg-white flex flex-wrap justify-start content-start gap-4 p-4 md:p-8 transition-colors shadow-[8px_8px_0px_0px_#000000] relative"
+        use:dndzone={{
+            items: localBoard,
+            flipDurationMs,
+            dropTargetStyle: { outline: "4px solid #000", outlineOffset: "8px" },
+        }}
         on:consider={handleDndConsider}
         on:finalize={handleDndFinalize}
     >
@@ -132,18 +140,39 @@
                 class:pointer-events-none={card.isFaceUp}
                 class:opacity-100={card.isFaceUp}
             >
-                <CardComponent
-                    {card}
-                    hidden={!card.isFaceUp}
-                    forceHide={isPrivateView}
-                    ownerName={$gameState.players.find(
-                        (p) => p.id === card.playerId,
-                    )?.name}
-                    ownerColor={$gameState.players.find(
-                        (p) => p.id === card.playerId,
-                    )?.color}
-                />
+                {#if SHADOW_ITEM_MARKER_PROPERTY_NAME in card}
+                    <!-- Drop-slot placeholder: shows exactly where the dragged card will land.
+                         svelte-dnd-action sets visibility:hidden on the shadow wrapper (its
+                         default indicator is the empty gap); `visible` here overrides that so
+                         our dashed slot actually shows. -->
+                    <div
+                        class="visible w-20 h-32 sm:w-24 sm:h-36 md:w-28 md:h-44 lg:w-32 lg:h-48 border-4 border-dashed border-black bg-black/10 flex items-center justify-center text-center font-mono font-black text-xs uppercase text-black/70 select-none"
+                    >
+                        Drop here
+                    </div>
+                {:else}
+                    <CardComponent
+                        {card}
+                        hidden={!card.isFaceUp}
+                        forceHide={isPrivateView}
+                        ownerName={$gameState.players.find(
+                            (p) => p.id === card.playerId,
+                        )?.name}
+                        ownerColor={$gameState.players.find(
+                            (p) => p.id === card.playerId,
+                        )?.color}
+                    />
+                {/if}
             </div>
         {/each}
+    </div>
+
+    <!-- Low -> High axis rail: reinforces that the sequence reads left (low) to right (high) -->
+    <div
+        class="w-full flex items-center gap-3 mt-3 px-1 text-xs font-black font-mono uppercase text-black/60 select-none pointer-events-none"
+    >
+        <span class="whitespace-nowrap">Low · 1</span>
+        <span class="flex-1 border-t-4 border-dashed border-black/30"></span>
+        <span class="whitespace-nowrap">100 · High</span>
     </div>
 </div>

@@ -44,7 +44,7 @@
 
 <div class="flex flex-col items-center gap-2">
     <div
-        class="w-24 h-36 md:w-32 md:h-48 border-4 border-black flex flex-col items-center justify-between bg-white shadow-[4px_4px_0px_0px_#000000] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] cursor-grab active:cursor-grabbing font-mono select-none overflow-hidden relative"
+        class="w-20 h-32 sm:w-24 sm:h-36 md:w-28 md:h-44 lg:w-32 lg:h-48 border-4 border-black flex flex-col items-center justify-between bg-white shadow-[4px_4px_0px_0px_#000000] transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_#000000] cursor-grab active:cursor-grabbing font-mono select-none overflow-hidden relative"
         class:bg-black={hidden}
         class:text-white={hidden}
     >
